@@ -21,14 +21,18 @@
 #include "content/nw/src/shell_main_delegate.h"
 
 #include "base/command_line.h"
-#include "base/file_path.h"
+#include "base/files/file_path.h"
+#include "base/file_util.h"
+#include "base/lazy_instance.h"
 #include "base/logging.h"
 #include "base/path_service.h"
-#include "base/utf_string_conversions.h"
+#include "base/strings/utf_string_conversions.h"
 #include "content/public/browser/browser_main_runner.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/url_constants.h"
+#include "content/nw/src/breakpad_linux.h"
+#include "content/nw/src/chrome_breakpad_client.h"
 #include "content/nw/src/common/shell_switches.h"
 #include "content/nw/src/nw_version.h"
 #include "content/nw/src/renderer/shell_content_renderer_client.h"
@@ -37,14 +41,19 @@
 #include "net/cookies/cookie_monster.h"
 #include "third_party/node/src/node_version.h"
 #include "ui/base/l10n/l10n_util.h"
+#if defined(OS_MACOSX)
+#include "ui/base/l10n/l10n_util_mac.h"
+#endif
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/base/ui_base_paths.h"
 #include "ui/base/ui_base_switches.h"
 
 #include <stdio.h>
 
+using base::FilePath;
+
 #if defined(OS_MACOSX)
-#include "content/shell/paths_mac.h"
+#include "content/nw/src/paths_mac.h"
 #endif  // OS_MACOSX
 
 #if defined(OS_WIN)
@@ -59,7 +68,8 @@
 #include "content/public/common/content_ipc_logging.h"
 #define IPC_LOG_TABLE_ADD_ENTRY(msg_id, logger) \
     content::RegisterIPCLogger(msg_id, logger)
-#include "content/nw/src/api/api_messages.h"
+#include "content/nw/src/common/common_message_generator.h"
+#include "components/autofill/core/common/autofill_messages.h"
 #endif
 
 namespace {
@@ -81,17 +91,24 @@ const GUID kContentShellProviderName = {
         { 0x84, 0x13, 0xec, 0x94, 0xd8, 0xc2, 0xa4, 0xb6 } };
 #endif
 
+base::LazyInstance<chrome::ChromeBreakpadClient>::Leaky
+    g_chrome_breakpad_client = LAZY_INSTANCE_INITIALIZER;
+
 void InitLogging() {
-  logging::InitLogging(
+  base::FilePath log_filename;
+  PathService::Get(base::DIR_EXE, &log_filename);
+  log_filename = log_filename.AppendASCII("debug.log");
+  logging::LoggingSettings settings;
+  if (CommandLine::ForCurrentProcess()->HasSwitch(switches::kEnableLogging)) {
+    settings.logging_dest = logging::LOG_TO_ALL;
+    settings.log_file = log_filename.value().c_str();
+    settings.delete_old = logging::DELETE_OLD_LOG_FILE;
+  }else{
 #if defined(OS_WIN)
-      L"debug.log",
-#else
-      "debug.log",
+    settings.logging_dest = logging::LOG_NONE;
 #endif
-      logging::LOG_ONLY_TO_SYSTEM_DEBUG_LOG,
-      logging::LOCK_LOG_FILE,
-      logging::DELETE_OLD_LOG_FILE,
-      logging::DISABLE_DCHECK_FOR_NON_OFFICIAL_RELEASE_BUILDS);
+  }
+  logging::InitLogging(settings);
   logging::SetLogItems(true, false, true, false);
 }
 
@@ -119,13 +136,25 @@ bool ShellMainDelegate::BasicStartupComplete(int* exit_code) {
 }
 
 void ShellMainDelegate::PreSandboxStartup() {
+  breakpad::SetBreakpadClient(g_chrome_breakpad_client.Pointer());
+  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  std::string pref_locale;
+  if (command_line->HasSwitch(switches::kLang)) {
+    pref_locale = command_line->GetSwitchValueASCII(switches::kLang);
+  }
+
 #if defined(OS_MACOSX)
   OverrideFrameworkBundlePath();
   OverrideChildProcessPath();
+  l10n_util::OverrideLocaleWithUserDefault();
 #endif  // OS_MACOSX
-  InitializeResourceBundle();
+  InitializeResourceBundle(pref_locale);
 
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  std::string process_type =
+      command_line->GetSwitchValueASCII(switches::kProcessType);
+
+  if (process_type != switches::kZygoteProcess)
+    InitCrashReporter();
 
   // Just prevent sandbox.
   command_line->AppendSwitch(switches::kNoSandbox);
@@ -141,6 +170,8 @@ void ShellMainDelegate::PreSandboxStartup() {
 
   // Allow file:// URIs can read other file:// URIs by default.
   command_line->AppendSwitch(switches::kAllowFileAccessFromFiles);
+  command_line->AppendSwitch(switches::kEnableExperimentalWebPlatformFeatures);
+  command_line->AppendSwitch(switches::kEnableCssShaders);
 }
 
 int ShellMainDelegate::RunProcess(
@@ -152,16 +183,27 @@ int ShellMainDelegate::RunProcess(
   return ShellBrowserMain(main_function_params);
 }
 
-void ShellMainDelegate::InitializeResourceBundle() {
+void ShellMainDelegate::InitializeResourceBundle(const std::string& pref_locale) {
   FilePath pak_file;
 #if defined(OS_MACOSX)
-  pak_file = GetResourcesPakFilePath();
+  FilePath locale_file;
+  if (!GetResourcesPakFilePath(pak_file))
+    LOG(FATAL) << "nw.pak file not found.";
+  std::string locale = l10n_util::GetApplicationLocale(pref_locale);
+  if (!GetLocalePakFilePath(locale, locale_file)) {
+    LOG(WARNING) << locale << ".pak file not found.";
+    locale = "en-US";
+    if (!GetLocalePakFilePath(locale, locale_file))
+      LOG(ERROR) << locale << ".pak file not found.";
+  }
+  ui::ResourceBundle::InitSharedInstanceWithPakPath2(pak_file, locale_file);
 #else
   FilePath pak_dir;
   PathService::Get(base::DIR_MODULE, &pak_dir);
   pak_file = pak_dir.Append(FILE_PATH_LITERAL("nw.pak"));
-#endif
+  CHECK(base::PathExists(pak_file)) << "nw.pak is missing";
   ui::ResourceBundle::InitSharedInstanceWithPakPath(pak_file);
+#endif
 }
 
 ContentBrowserClient* ShellMainDelegate::CreateContentBrowserClient() {
@@ -173,5 +215,13 @@ ContentRendererClient* ShellMainDelegate::CreateContentRendererClient() {
   renderer_client_.reset(new ShellContentRendererClient);
   return renderer_client_.get();
 }
+
+#if defined(OS_POSIX) && !defined(OS_MACOSX)
+void ShellMainDelegate::ZygoteForked() {
+  // Needs to be called after we have chrome::DIR_USER_DATA.  BrowserMain sets
+  // this up for the browser process in a different manner.
+  InitCrashReporter();
+}
+#endif
 
 }  // namespace content

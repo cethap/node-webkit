@@ -20,8 +20,8 @@
 
 #include "content/nw/src/api/tray/tray.h"
 
-#include "base/file_path.h"
-#include "base/utf_string_conversions.h"
+#include "base/files/file_path.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "chrome/browser/status_icons/status_icon.h"
 #include "chrome/browser/status_icons/status_icon_observer.h"
@@ -32,7 +32,7 @@
 #include "content/nw/src/nw_shell.h"
 #include "ui/gfx/image/image.h"
 
-namespace api {
+namespace nwapi {
 
 StatusTray* Tray::status_tray_ = NULL;
 
@@ -58,7 +58,8 @@ void Tray::Create(const base::DictionaryValue& option) {
   if (!status_tray_)
     status_tray_ = StatusTray::Create();
 
-  status_icon_ = status_tray_->CreateStatusIcon();
+  status_icon_ = status_tray_->CreateStatusIcon(StatusTray::NOTIFICATION_TRAY_ICON,
+                                                gfx::ImageSkia(), base::string16());
   status_observer_ = new TrayObserver(this);
   status_icon_->AddObserver(status_observer_);
 }
@@ -79,7 +80,7 @@ void Tray::SetIcon(const std::string& path) {
   content::Shell* shell = content::Shell::FromRenderViewHost(
       dispatcher_host()->render_view_host());
   nw::Package* package = shell->GetPackage();
-  package->GetImage(FilePath::FromUTF8Unsafe(path), &icon);
+  package->GetImage(base::FilePath::FromUTF8Unsafe(path), &icon);
 
   if (!icon.IsEmpty())
     status_icon_->SetImage(*icon.ToImageSkia());
@@ -106,4 +107,4 @@ void Tray::Remove() {
 void Tray::SetAltIcon(const std::string& alticon_path) {
 }
 
-}  // namespace api
+}  // namespace nwapi

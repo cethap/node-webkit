@@ -20,11 +20,12 @@
 
 #include "content/nw/src/browser/shell_devtools_delegate.h"
 
+#include "base/files/file_path.h"
 #include "content/nw/src/nw_shell.h"
 #include "content/public/browser/devtools_http_handler.h"
 #include "content/public/browser/web_contents.h"
 #include "grit/nw_resources.h"
-#include "net/base/tcp_listen_socket.h"
+#include "net/socket/tcp_listen_socket.h"
 #include "net/url_request/url_request_context_getter.h"
 #include "ui/base/layout.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -57,8 +58,8 @@ bool ShellDevToolsDelegate::BundlesFrontendResources() {
   return true;
 }
 
-FilePath ShellDevToolsDelegate::GetDebugFrontendDir() {
-  return FilePath();
+base::FilePath ShellDevToolsDelegate::GetDebugFrontendDir() {
+  return base::FilePath();
 }
 
 std::string ShellDevToolsDelegate::GetPageThumbnailData(const GURL& url) {
@@ -72,6 +73,23 @@ RenderViewHost* ShellDevToolsDelegate::CreateNewTarget() {
                                MSG_ROUTING_NONE,
                                NULL);
   return shell->web_contents()->GetRenderViewHost();
+}
+
+DevToolsHttpHandlerDelegate::TargetType
+ShellDevToolsDelegate::GetTargetType(RenderViewHost*) {
+  return kTargetTypeTab;
+}
+
+std::string ShellDevToolsDelegate::GetViewDescription(
+    content::RenderViewHost*) {
+  return std::string();
+}
+
+scoped_refptr<net::StreamListenSocket>
+ShellDevToolsDelegate::CreateSocketForTethering(
+    net::StreamListenSocket::Delegate* delegate,
+    std::string* name) {
+  return NULL;
 }
 
 }  // namespace content

@@ -26,9 +26,11 @@
 #include "base/path_service.h"
 #include "base/values.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/resource_context.h"
+#include "content/public/browser/storage_partition.h"
+#include "content/public/common/content_switches.h"
 #include "content/nw/src/browser/shell_download_manager_delegate.h"
 #include "content/nw/src/common/shell_switches.h"
-#include "content/nw/src/browser/shell_resource_context.h"
 #include "content/nw/src/net/shell_url_request_context_getter.h"
 #include "content/nw/src/nw_package.h"
 
@@ -41,12 +43,44 @@
 #endif
 
 namespace content {
+class ShellBrowserContext::ShellResourceContext : public ResourceContext {
+ public:
+  ShellResourceContext() : getter_(NULL) {}
+  virtual ~ShellResourceContext() {}
+
+  // ResourceContext implementation:
+  virtual net::HostResolver* GetHostResolver() OVERRIDE {
+    CHECK(getter_);
+    return getter_->host_resolver();
+  }
+  virtual net::URLRequestContext* GetRequestContext() OVERRIDE {
+    CHECK(getter_);
+    return getter_->GetURLRequestContext();
+  }
+  virtual bool AllowMicAccess(const GURL& origin) OVERRIDE {
+    return true;
+  }
+  virtual bool AllowCameraAccess(const GURL& origin) OVERRIDE {
+    return true;
+  }
+
+  void set_url_request_context_getter(ShellURLRequestContextGetter* getter) {
+    getter_ = getter;
+  }
+
+ private:
+  ShellURLRequestContextGetter* getter_;
+
+  DISALLOW_COPY_AND_ASSIGN(ShellResourceContext);
+};
 
 ShellBrowserContext::ShellBrowserContext(bool off_the_record,
                                          nw::Package* package)
   : disable_pinning_renderer_(false),
     off_the_record_(off_the_record),
-    package_(package) {
+    ignore_certificate_errors_(false),
+    package_(package),
+    resource_context_(new ShellResourceContext) {
   InitWhileIOAllowed();
 }
 
@@ -59,6 +93,9 @@ ShellBrowserContext::~ShellBrowserContext() {
 
 void ShellBrowserContext::InitWhileIOAllowed() {
   CommandLine* cmd_line = CommandLine::ForCurrentProcess();
+  if (cmd_line->HasSwitch(switches::kIgnoreCertificateErrors)) {
+    ignore_certificate_errors_ = true;
+  }
   if (cmd_line->HasSwitch(switches::kContentShellDataPath)) {
     path_ = cmd_line->GetSwitchValuePath(switches::kContentShellDataPath);
     return;
@@ -88,11 +125,11 @@ void ShellBrowserContext::InitWhileIOAllowed() {
   NOTIMPLEMENTED();
 #endif
 
-  if (!file_util::PathExists(path_))
+  if (!base::PathExists(path_))
     file_util::CreateDirectory(path_);
 }
 
-FilePath ShellBrowserContext::GetPath() {
+FilePath ShellBrowserContext::GetPath() const {
   return path_;
 }
 
@@ -112,13 +149,21 @@ DownloadManagerDelegate* ShellBrowserContext::GetDownloadManagerDelegate()  {
 }
 
 net::URLRequestContextGetter* ShellBrowserContext::GetRequestContext()  {
-  if (!url_request_getter_) {
-    url_request_getter_ = new ShellURLRequestContextGetter(
-        GetPath(),
-        BrowserThread::UnsafeGetMessageLoopForThread(BrowserThread::IO),
-        BrowserThread::UnsafeGetMessageLoopForThread(BrowserThread::FILE));
-  }
-  return url_request_getter_;
+  return GetDefaultStoragePartition(this)->GetURLRequestContext();
+}
+
+net::URLRequestContextGetter* ShellBrowserContext::CreateRequestContext(
+    ProtocolHandlerMap* protocol_handlers) {
+  DCHECK(!url_request_getter_);
+  url_request_getter_ = new ShellURLRequestContextGetter(
+      ignore_certificate_errors_,
+      GetPath(),
+      package_->path(),
+      BrowserThread::UnsafeGetMessageLoopForThread(BrowserThread::IO),
+      BrowserThread::UnsafeGetMessageLoopForThread(BrowserThread::FILE),
+      protocol_handlers, this);
+  resource_context_->set_url_request_context_getter(url_request_getter_.get());
+  return url_request_getter_.get();
 }
 
 net::URLRequestContextGetter*
@@ -146,17 +191,14 @@ net::URLRequestContextGetter*
 }
 
 net::URLRequestContextGetter*
-    ShellBrowserContext::GetRequestContextForStoragePartition(
-        const FilePath& partition_path,
-        bool in_memory) {
+    ShellBrowserContext::CreateRequestContextForStoragePartition(
+        const base::FilePath& partition_path,
+        bool in_memory,
+        ProtocolHandlerMap* protocol_handlers) {
   return NULL;
 }
 
 ResourceContext* ShellBrowserContext::GetResourceContext()  {
-  if (!resource_context_.get()) {
-    resource_context_.reset(new ShellResourceContext(
-        static_cast<ShellURLRequestContextGetter*>(GetRequestContext())));
-  }
   return resource_context_.get();
 }
 
@@ -165,13 +207,17 @@ GeolocationPermissionContext*
   return NULL;
 }
 
-SpeechRecognitionPreferences*
-    ShellBrowserContext::GetSpeechRecognitionPreferences() {
-  return NULL;
-}
-
 quota::SpecialStoragePolicy* ShellBrowserContext::GetSpecialStoragePolicy() {
   return NULL;
 }
+
+void ShellBrowserContext::RequestMIDISysExPermission(
+      int render_process_id,
+      int render_view_id,
+      const GURL& requesting_frame,
+      const MIDISysExPermissionCallback& callback) {
+  callback.Run(true);
+}
+
 
 }  // namespace content

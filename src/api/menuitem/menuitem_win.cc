@@ -20,15 +20,15 @@
 
 #include "content/nw/src/api/menuitem/menuitem.h"
 
-#include "base/file_path.h"
-#include "base/utf_string_conversions.h"
+#include "base/files/file_path.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "content/nw/src/api/dispatcher_host.h"
 #include "content/nw/src/api/menu/menu.h"
 #include "content/nw/src/nw_package.h"
 #include "content/nw/src/nw_shell.h"
 
-namespace api {
+namespace nwapi {
 
 void MenuItem::Create(const base::DictionaryValue& option) {
   is_modified_ = false;
@@ -80,7 +80,7 @@ void MenuItem::SetIcon(const std::string& icon) {
   content::Shell* shell = content::Shell::FromRenderViewHost(
       dispatcher_host()->render_view_host());
   nw::Package* package = shell->GetPackage();
-  package->GetImage(FilePath::FromUTF8Unsafe(icon), &icon_);
+  package->GetImage(base::FilePath::FromUTF8Unsafe(icon), &icon_);
 }
 
 void MenuItem::SetTooltip(const std::string& tooltip) {
@@ -99,4 +99,4 @@ void MenuItem::SetSubmenu(Menu* menu) {
   submenu_ = menu;
 }
 
-}  // namespace api
+}  // namespace nwapi

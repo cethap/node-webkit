@@ -5,6 +5,11 @@
 {
   'variables': {
     'nw_product_name': 'node-webkit',
+    'conditions': [
+      ['OS=="linux"', {
+       'linux_dump_symbols%': 1,
+      }],
+    ],
   },
   'targets': [
     {
@@ -17,8 +22,9 @@
       'dependencies': [
         '<(DEPTH)/base/base.gyp:base',
         '<(DEPTH)/base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
-        '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
-        '<(DEPTH)/content/content.gyp:content_app',
+        '<(DEPTH)/components/components.gyp:autofill_content_renderer',
+        '<(DEPTH)/components/components.gyp:browser_context_keyed_service',
+        '<(DEPTH)/content/content.gyp:content_app_browser',
         '<(DEPTH)/content/content.gyp:content_browser',
         '<(DEPTH)/content/content.gyp:content_common',
         '<(DEPTH)/content/content.gyp:content_gpu',
@@ -32,20 +38,41 @@
         '<(DEPTH)/media/media.gyp:media',
         '<(DEPTH)/net/net.gyp:net_with_v8',
         '<(DEPTH)/net/net.gyp:net_resources',
+        '<(DEPTH)/printing/printing.gyp:printing',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/node/node.gyp:node',
         '<(DEPTH)/ui/ui.gyp:ui',
         '<(DEPTH)/ui/ui.gyp:ui_resources',
+        '<(DEPTH)/url/url.gyp:url_lib',
         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
         '<(DEPTH)/webkit/support/webkit_support.gyp:webkit_support',
         '<(DEPTH)/third_party/zlib/zlib.gyp:minizip',
-        '<(webkit_src_dir)/Source/WebKit/chromium/WebKit.gyp:webkit',
+        '<(DEPTH)/third_party/WebKit/public/blink.gyp:blink',
         'nw_resources',
       ],
       'include_dirs': [
         '<(DEPTH)',
+        '<(DEPTH)/third_party/WebKit/Source',
+        '<(DEPTH)/third_party/WebKit/public/web',
+        '<(DEPTH)/breakpad/src',
+        '<(SHARED_INTERMEDIATE_DIR)/blink',
+        '<(SHARED_INTERMEDIATE_DIR)/blink/bindings',
+      ],
+      'cflags_cc': [
+        '-Wno-error=c++0x-compat',
       ],
       'sources': [
+        '<(DEPTH)/chrome/browser/chrome_process_finder_win.cc',
+        '<(DEPTH)/chrome/browser/chrome_process_finder_win.h',
+        '<(DEPTH)/chrome/common/child_process_logging.h',
+        '<(DEPTH)/chrome/common/child_process_logging_mac.mm',
+        '<(DEPTH)/chrome/common/child_process_logging_posix.cc',
+        '<(DEPTH)/chrome/common/child_process_logging_win.cc',
+        '<(DEPTH)/chrome/common/crash_keys.cc',
+        '<(DEPTH)/chrome/common/dump_without_crashing.cc',
+        '<(DEPTH)/chrome/common/env_vars.cc',
+        '<(DEPTH)/chrome/browser/crash_upload_list.cc',
+        '<(DEPTH)/chrome/browser/upload_list.cc',
         '<(DEPTH)/chrome/browser/platform_util_common_linux.cc',
         '<(DEPTH)/chrome/browser/platform_util_linux.cc',
         '<(DEPTH)/chrome/browser/platform_util_mac.mm',
@@ -73,17 +100,17 @@
         '<(DEPTH)/chrome/common/chrome_constants.h',
         '<(DEPTH)/chrome/common/chrome_switches.cc',
         '<(DEPTH)/chrome/common/chrome_switches.h',
-        '<(DEPTH)/chrome/common/extensions/draggable_region.cc',
-        '<(DEPTH)/chrome/common/extensions/draggable_region.h',
-        '<(DEPTH)/chrome/common/zip.cc',
-        '<(DEPTH)/chrome/common/zip.h',
-        '<(DEPTH)/chrome/common/zip_reader.cc',
-        '<(DEPTH)/chrome/common/zip_reader.h',
-        '<(DEPTH)/chrome/common/zip_internal.cc',
-        '<(DEPTH)/chrome/common/zip_internal.h',
-        '<(DEPTH)/chrome/renderer/page_click_listener.h',
-        '<(DEPTH)/chrome/renderer/page_click_tracker.cc',
-        '<(DEPTH)/chrome/renderer/page_click_tracker.h',
+        '<(DEPTH)/extensions/common/draggable_region.cc',
+        '<(DEPTH)/extensions/common/draggable_region.h',
+        '<(DEPTH)/third_party/zlib/google/zip.cc',
+        '<(DEPTH)/third_party/zlib/google/zip.h',
+        '<(DEPTH)/third_party/zlib/google/zip_reader.cc',
+        '<(DEPTH)/third_party/zlib/google/zip_reader.h',
+        '<(DEPTH)/third_party/zlib/google/zip_internal.cc',
+        '<(DEPTH)/third_party/zlib/google/zip_internal.h',
+        '<(DEPTH)/components/autofill/content/renderer/page_click_listener.h',
+        '<(DEPTH)/components/autofill/content/renderer/page_click_tracker.cc',
+        '<(DEPTH)/components/autofill/content/renderer/page_click_tracker.h',
         '<(DEPTH)/chrome/renderer/static_v8_external_string_resource.cc',
         '<(DEPTH)/chrome/renderer/static_v8_external_string_resource.h',
         'src/api/api_messages.cc',
@@ -131,6 +158,11 @@
         'src/browser/app_controller_mac.mm',
         'src/browser/capture_page_helper.h',
         'src/browser/capture_page_helper.cc',
+        'src/browser/color_chooser_gtk.cc',
+        'src/browser/color_chooser_win.cc',
+        'src/browser/color_chooser_mac.mm',
+        'src/browser/chrome_event_processing_window.mm',
+        'src/browser/chrome_event_processing_window.h',
         'src/browser/file_select_helper.cc',
         'src/browser/file_select_helper.h',
         'src/browser/native_window.cc',
@@ -144,6 +176,23 @@
         'src/browser/native_window_toolbar_win.h',
         'src/browser/native_window_win.cc',
         'src/browser/native_window_win.h',
+        'src/browser/net_disk_cache_remover.cc',
+        'src/browser/net_disk_cache_remover.h',
+        'src/browser/printing/print_dialog_gtk.cc',
+        'src/browser/printing/print_dialog_gtk.h',
+        'src/browser/printing/print_job.cc',
+        'src/browser/printing/print_job.h',
+        'src/browser/printing/print_job_manager.cc',
+        'src/browser/printing/print_job_manager.h',
+        'src/browser/printing/print_job_worker.cc',
+        'src/browser/printing/print_job_worker.h',
+        'src/browser/printing/print_job_worker_owner.h',
+        'src/browser/printing/printing_message_filter.cc',
+        'src/browser/printing/printing_message_filter.h',
+        'src/browser/printing/printer_query.cc',
+        'src/browser/printing/printer_query.h',
+        'src/browser/printing/print_view_manager.cc',
+        'src/browser/printing/print_view_manager.h',
         'src/browser/shell_application_mac.h',
         'src/browser/shell_application_mac.mm',
         'src/browser/shell_devtools_delegate.cc',
@@ -164,18 +213,26 @@
         'src/browser/shell_login_dialog_win.cc',
         'src/browser/shell_login_dialog.cc',
         'src/browser/shell_login_dialog.h',
-        'src/browser/shell_resource_context.cc',
-        'src/browser/shell_resource_context.h',
         'src/browser/shell_resource_dispatcher_host_delegate.cc',
         'src/browser/shell_resource_dispatcher_host_delegate.h',
         'src/browser/shell_toolbar_delegate_mac.h',
         'src/browser/shell_toolbar_delegate_mac.mm',
         'src/browser/standard_menus_mac.h',
         'src/browser/standard_menus_mac.mm',
-        'src/common/gpu_internals.cc',
-        'src/common/gpu_internals.h',
+        'src/chrome_breakpad_client.cc',
+        'src/chrome_breakpad_client.h',
+        'src/chrome_breakpad_client_mac.mm',
+        'src/common/print_messages.cc',
+        'src/common/print_messages.h',
         'src/common/shell_switches.cc',
         'src/common/shell_switches.h',
+        'src/breakpad_linux_impl.h',
+        'src/breakpad_mac.mm',
+        'src/breakpad_mac.h',
+        'src/breakpad_win.cc',
+        'src/breakpad_win.h',
+        'src/hard_error_handler_win.cc',
+        'src/hard_error_handler_win.h',
         'src/geolocation/shell_access_token_store.cc',
         'src/geolocation/shell_access_token_store.h',
         'src/media/media_internals.cc',
@@ -184,6 +241,8 @@
         'src/media/media_capture_devices_dispatcher.h',
         'src/media/media_stream_devices_controller.cc',
         'src/media/media_stream_devices_controller.h',
+        'src/net/app_protocol_handler.cc',
+        'src/net/app_protocol_handler.h',
         'src/net/clear_on_exit_policy.h',
         'src/net/clear_on_exit_policy.cc',
         'src/net/resource_request_job.cc',
@@ -192,8 +251,6 @@
         'src/net/shell_network_delegate.h',
         'src/net/shell_url_request_context_getter.cc',
         'src/net/shell_url_request_context_getter.h',
-        'src/net/sqlite_persistent_cookie_store.h',
-        'src/net/sqlite_persistent_cookie_store.cc',
         'src/nw_protocol_handler.cc',
         'src/nw_protocol_handler.h',
         'src/nw_package.cc',
@@ -201,12 +258,17 @@
         'src/nw_version.h',
         'src/paths_mac.h',
         'src/paths_mac.mm',
-        'src/renderer/autofill_agent.h',
         'src/renderer/autofill_agent.cc',
+        'src/renderer/autofill_agent.h',
         'src/renderer/common/render_messages.cc',
         'src/renderer/common/render_messages.h',
         'src/renderer/prerenderer/prerenderer_client.cc',
         'src/renderer/prerenderer/prerenderer_client.h',
+        'src/renderer/printing/print_web_view_helper.cc',
+        'src/renderer/printing/print_web_view_helper.h',
+        'src/renderer/printing/print_web_view_helper_linux.cc',
+        'src/renderer/printing/print_web_view_helper_mac.mm',
+        'src/renderer/printing/print_web_view_helper_win.cc',
         'src/renderer/nw_render_view_observer.cc',
         'src/renderer/nw_render_view_observer.h',
         'src/renderer/shell_content_renderer_client.cc',
@@ -228,6 +290,8 @@
         'src/shell_content_client.h',
         'src/shell_main_delegate.cc',
         'src/shell_main_delegate.h',
+        'src/shell_quota_permission_context.cc',
+        'src/shell_quota_permission_context.h',
       ],
       'msvs_settings': {
         'VCLinkerTool': {
@@ -240,7 +304,53 @@
             '<(DEPTH)/base/allocator/allocator.gyp:allocator',
           ],
         }],
+        ['(os_posix==1 and OS != "mac" and linux_use_tcmalloc==1)', {
+          'dependencies': [
+            # This is needed by content/app/content_main_runner.cc
+            '<(DEPTH)/base/allocator/allocator.gyp:allocator',
+          ],
+        }],
         ['OS=="win"', {
+          'dependencies': [
+            '<(DEPTH)/breakpad/breakpad.gyp:breakpad_handler',
+            '<(DEPTH)/breakpad/breakpad.gyp:breakpad_sender',
+            '<(DEPTH)/components/components.gyp:breakpad_component',
+          ],
+        }],
+        ['os_posix==1 and OS != "mac" and OS != "ios"', {
+          'sources': [
+            'src/breakpad_linux.cc',
+            'src/breakpad_linux.h',
+            'src/crash_handler_host_linux.cc',
+            'src/crash_handler_host_linux.h',
+          ],
+          'dependencies': [
+            '<(DEPTH)/breakpad/breakpad.gyp:breakpad_client',
+            '<(DEPTH)/components/components.gyp:breakpad_component',
+          ],
+        }],
+        ['OS == "mac"', {
+          'sources!': [
+            '<(DEPTH)/chrome/common/child_process_logging_posix.cc',
+          ],
+          'dependencies': [
+            '<(DEPTH)/breakpad/breakpad.gyp:breakpad',
+            '<(DEPTH)/components/components.gyp:breakpad_component',
+          ],
+        }],
+        ['toolkit_uses_gtk == 1', {
+          'dependencies': [
+            # For FT_Init_FreeType and friends.
+            '../build/linux/system.gyp:freetype2',
+            '../build/linux/system.gyp:gtk',
+            '../build/linux/system.gyp:gtkprint',
+          ],
+        }],
+        ['OS=="win"', {
+          'sources': [
+            'src/browser/color_chooser_dialog.cc',
+            'src/browser/color_chooser_dialog.h',
+          ],
           'resource_include_dirs': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit',
           ],
@@ -248,8 +358,8 @@
             '<(DEPTH)/ui/ui.gyp:ui_resources',
             '<(DEPTH)/ui/views/controls/webview/webview.gyp:webview',
             '<(DEPTH)/ui/views/views.gyp:views',
-            '<(DEPTH)/webkit/support/webkit_support.gyp:webkit_resources',
-            '<(DEPTH)/webkit/support/webkit_support.gyp:webkit_strings',
+            '<(DEPTH)/webkit/webkit_resources.gyp:webkit_resources',
+            '<(DEPTH)/webkit/webkit_resources.gyp:webkit_strings',
           ],
           'configurations': {
             'Debug_Base': {
@@ -260,6 +370,7 @@
               },
             },
           },
+          'msvs_disabled_warnings': [ 4800 ],
         }],  # OS=="win"
       ],
     },
@@ -268,6 +379,7 @@
       'type': 'none',
       'dependencies': [
         'generate_nw_resources',
+        'about_credits',
       ],
       'variables': {
         'grit_out_dir': '<(SHARED_INTERMEDIATE_DIR)/content',
@@ -277,7 +389,65 @@
         {
           'destination': '<(PRODUCT_DIR)',
           'files': [
-            '<(SHARED_INTERMEDIATE_DIR)/content/nw_resources.pak'
+            '<(SHARED_INTERMEDIATE_DIR)/content/nw_resources.pak',
+          ],
+        },
+        {
+          'destination': '<(PRODUCT_DIR)/locale',
+          'files': [
+            '<(SHARED_INTERMEDIATE_DIR)/content/en-US.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/am.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/ar.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/bg.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/bn.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/ca.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/cs.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/da.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/de.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/el.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/en-GB.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/es.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/es-419.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/et.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/fa.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/fi.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/fil.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/fr.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/gu.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/hi.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/hr.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/hu.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/id.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/it.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/iw.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/ja.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/kn.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/ko.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/lt.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/lv.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/ml.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/mr.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/ms.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/nl.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/no.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/pl.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/pt-BR.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/pt-PT.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/ro.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/ru.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/sk.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/sl.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/sr.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/sv.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/sw.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/ta.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/te.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/th.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/tr.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/uk.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/vi.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/zh-CN.pak',
+            '<(SHARED_INTERMEDIATE_DIR)/content/zh-TW.pak',
           ],
         },
       ],
@@ -295,6 +465,40 @@
             'grit_grd_file': 'src/resources/nw_resources.grd',
           },
           'includes': [ '../../build/grit_action.gypi' ],
+        },
+        {
+          'action_name': 'nw_strings',
+          'variables': {
+            'grit_grd_file': 'src/resources/nw_strings.grd',
+          },
+          'includes': [ '../../build/grit_action.gypi' ],
+        },
+      ],
+    },
+    {
+      'target_name': 'about_credits',
+      'type': 'none',
+      'actions': [
+        {
+          'variables': {
+            'generator_path': '../../tools/licenses.py',
+            'about_credits_file': '<(PRODUCT_DIR)/credits.html',
+          },
+          'action_name': 'generate_about_credits',
+          'inputs': [
+            # TODO(phajdan.jr): make licenses.py print inputs too.
+            '<(generator_path)',
+          ],
+          'outputs': [
+            '<(about_credits_file)',
+          ],
+          'hard_dependency': 1,
+          'action': ['python',
+                     '<(generator_path)',
+                     'credits',
+                     '<(about_credits_file)',
+          ],
+          'message': 'Generating about:credits.',
         },
       ],
     },
@@ -323,7 +527,7 @@
               '<(SHARED_INTERMEDIATE_DIR)/ui/ui_resources/ui_resources_100_percent.pak',
               '<(SHARED_INTERMEDIATE_DIR)/ui/ui_strings/ui_strings_en-US.pak',
               '<(SHARED_INTERMEDIATE_DIR)/webkit/devtools_resources.pak',
-              '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_chromium_resources.pak',
+              '<(SHARED_INTERMEDIATE_DIR)/webkit/blink_resources.pak',
               '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_resources_100_percent.pak',
               '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_strings_en-US.pak',
             ],
@@ -341,7 +545,28 @@
       ],
     },
     {
-      'target_name': 'nw_package_bin',
+      'target_name': 'strip',
+      'type': 'none',
+      'actions': [
+        {
+          'action_name': 'strip_nw_binaries',
+          'inputs': [
+            '<(PRODUCT_DIR)/nw',
+          ],
+          'outputs': [
+            '<(PRODUCT_DIR)/strip_nw.stamp',
+          ],
+          'action': ['strip',
+                     '<@(_inputs)'],
+          'message': 'Stripping release executable',
+        },
+      ],
+      'dependencies': [
+        'nw',
+      ],
+    },
+    {
+      'target_name': 'dist',
       'type': 'none',
       'actions': [
         {
@@ -357,6 +582,16 @@
           ],
           'action': ['python', '<(package_script)'],
         },
+      ],
+      'dependencies': [
+        '<(DEPTH)/chrome/chrome.gyp:chromedriver2_server',
+      ],
+      'conditions': [
+        ['OS == "linux"', {
+          'dependencies': [
+            'strip',
+          ],
+        }],
       ],
     },
     {
@@ -395,6 +630,11 @@
         'VCLinkerTool': {
           'SubSystem': '2',  # Set /SUBSYSTEM:WINDOWS
         },
+	'VCManifestTool': {
+          'AdditionalManifestFiles': [
+            '$(ProjectDir)\\nw\\src\\nw.exe.manifest',
+          ],
+        },
       },
       'conditions': [
         ['OS=="win" and win_use_allocator_shim==1', {
@@ -405,7 +645,7 @@
         ['OS=="win"', {
           'sources': [
             'src/shell.rc',
-            '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_unscaled_resources.rc',
+            '<(SHARED_INTERMEDIATE_DIR)/ui/ui_resources/ui_unscaled_resources.rc',
           ],
           'configurations': {
             'Debug_Base': {
@@ -417,7 +657,7 @@
             },
           },
         }],  # OS=="win"
-        ['OS == "win" or (toolkit_uses_gtk == 1 and selinux == 0)', {
+        ['OS == "win" or toolkit_uses_gtk == 1', {
           'dependencies': [
             '<(DEPTH)/sandbox/sandbox.gyp:sandbox',
           ],
@@ -441,6 +681,7 @@
               'destination': '<(PRODUCT_DIR)/<(nw_product_name).app/Contents/Frameworks',
               'files': [
                 '<(PRODUCT_DIR)/<(nw_product_name) Helper.app',
+                '<(PRODUCT_DIR)/crash_inspector',
               ],
             },
           ],
@@ -509,7 +750,60 @@
           'mac_bundle': 1,
           'mac_bundle_resources': [
             'src/mac/English.lproj/HttpAuth.xib',
-            '<(PRODUCT_DIR)/nw.pak'
+            '<(PRODUCT_DIR)/nw.pak',
+            '<(PRODUCT_DIR)/locale/en-US.pak',
+            '<(PRODUCT_DIR)/locale/am.pak',
+            '<(PRODUCT_DIR)/locale/ar.pak',
+            '<(PRODUCT_DIR)/locale/bg.pak',
+            '<(PRODUCT_DIR)/locale/bn.pak',
+            '<(PRODUCT_DIR)/locale/ca.pak',
+            '<(PRODUCT_DIR)/locale/cs.pak',
+            '<(PRODUCT_DIR)/locale/da.pak',
+            '<(PRODUCT_DIR)/locale/de.pak',
+            '<(PRODUCT_DIR)/locale/el.pak',
+            '<(PRODUCT_DIR)/locale/en-GB.pak',
+            '<(PRODUCT_DIR)/locale/es.pak',
+            '<(PRODUCT_DIR)/locale/es-419.pak',
+            '<(PRODUCT_DIR)/locale/et.pak',
+            '<(PRODUCT_DIR)/locale/fa.pak',
+            '<(PRODUCT_DIR)/locale/fi.pak',
+            '<(PRODUCT_DIR)/locale/fil.pak',
+            '<(PRODUCT_DIR)/locale/fr.pak',
+            '<(PRODUCT_DIR)/locale/gu.pak',
+            '<(PRODUCT_DIR)/locale/hi.pak',
+            '<(PRODUCT_DIR)/locale/hr.pak',
+            '<(PRODUCT_DIR)/locale/hu.pak',
+            '<(PRODUCT_DIR)/locale/id.pak',
+            '<(PRODUCT_DIR)/locale/it.pak',
+            '<(PRODUCT_DIR)/locale/iw.pak',
+            '<(PRODUCT_DIR)/locale/ja.pak',
+            '<(PRODUCT_DIR)/locale/kn.pak',
+            '<(PRODUCT_DIR)/locale/ko.pak',
+            '<(PRODUCT_DIR)/locale/lt.pak',
+            '<(PRODUCT_DIR)/locale/lv.pak',
+            '<(PRODUCT_DIR)/locale/ml.pak',
+            '<(PRODUCT_DIR)/locale/mr.pak',
+            '<(PRODUCT_DIR)/locale/ms.pak',
+            '<(PRODUCT_DIR)/locale/nl.pak',
+            '<(PRODUCT_DIR)/locale/no.pak',
+            '<(PRODUCT_DIR)/locale/pl.pak',
+            '<(PRODUCT_DIR)/locale/pt-BR.pak',
+            '<(PRODUCT_DIR)/locale/pt-PT.pak',
+            '<(PRODUCT_DIR)/locale/ro.pak',
+            '<(PRODUCT_DIR)/locale/ru.pak',
+            '<(PRODUCT_DIR)/locale/sk.pak',
+            '<(PRODUCT_DIR)/locale/sl.pak',
+            '<(PRODUCT_DIR)/locale/sr.pak',
+            '<(PRODUCT_DIR)/locale/sv.pak',
+            '<(PRODUCT_DIR)/locale/sw.pak',
+            '<(PRODUCT_DIR)/locale/ta.pak',
+            '<(PRODUCT_DIR)/locale/te.pak',
+            '<(PRODUCT_DIR)/locale/th.pak',
+            '<(PRODUCT_DIR)/locale/tr.pak',
+            '<(PRODUCT_DIR)/locale/uk.pak',
+            '<(PRODUCT_DIR)/locale/vi.pak',
+            '<(PRODUCT_DIR)/locale/zh-CN.pak',
+            '<(PRODUCT_DIR)/locale/zh-TW.pak',
           ],
           'dependencies': [
             'nw_lib',
@@ -608,5 +902,40 @@
         },  # target nw_helper_app
       ],
     }],  # OS=="mac"
-  ]
+    ['OS=="linux"',
+      { 'targets': [
+        {
+          'target_name': 'nw_symbols',
+          'type': 'none',
+          'conditions': [
+            ['linux_dump_symbols==1', {
+              'actions': [
+                {
+                  'action_name': 'dump_symbols',
+                  'inputs': [
+                    '<(DEPTH)/build/linux/dump_app_syms',
+                    '<(PRODUCT_DIR)/dump_syms',
+                    '<(PRODUCT_DIR)/nw',
+                  ],
+                  'outputs': [
+                    '<(PRODUCT_DIR)/nw.breakpad.<(target_arch)',
+                  ],
+                  'action': ['<(DEPTH)/build/linux/dump_app_syms',
+                             '<(PRODUCT_DIR)/dump_syms',
+                             '<(linux_strip_binary)',
+                             '<(PRODUCT_DIR)/nw',
+                             '<@(_outputs)'],
+                  'message': 'Dumping breakpad symbols to <(_outputs)',
+                  'process_outputs_as_sources': 1,
+                },
+              ],
+              'dependencies': [
+                'nw',
+                '../breakpad/breakpad.gyp:dump_syms',
+              ],
+            }],
+          ],
+        }],
+    }], # OS=="linux"
+  ] # conditions
 }

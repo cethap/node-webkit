@@ -8,13 +8,13 @@
 #include "base/compiler_specific.h"
 #include "base/callback_forward.h"
 #include "base/memory/scoped_ptr.h"
-#include "content/public/browser/javascript_dialogs.h"
+#include "content/public/browser/javascript_dialog_manager.h"
 
 namespace content {
 
 class ShellJavaScriptDialog;
 
-class ShellJavaScriptDialogCreator : public JavaScriptDialogCreator {
+class ShellJavaScriptDialogCreator : public JavaScriptDialogManager {
  public:
   ShellJavaScriptDialogCreator();
   virtual ~ShellJavaScriptDialogCreator();
@@ -36,10 +36,12 @@ class ShellJavaScriptDialogCreator : public JavaScriptDialogCreator {
       bool is_reload,
       const DialogClosedCallback& callback) OVERRIDE;
 
-  virtual void ResetJavaScriptState(WebContents* web_contents) OVERRIDE;
+  virtual void CancelActiveAndPendingDialogs(
+      WebContents* web_contents) OVERRIDE;
 
   // Called by the ShellJavaScriptDialog when it closes.
   void DialogClosed(ShellJavaScriptDialog* dialog);
+  virtual void WebContentsDestroyed(WebContents* web_contents) OVERRIDE;
 
   // Used for content_browsertests.
   void set_dialog_request_callback(

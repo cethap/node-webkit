@@ -23,7 +23,7 @@
 
 #include "ui/base/models/simple_menu_model.h"
 
-namespace api {
+namespace nwapi {
   
 class DispatcherHost;
 
@@ -44,7 +44,7 @@ class MenuDelegate : public ui::SimpleMenuModel::Delegate {
   virtual bool GetIconForCommandId(int command_id,
                                    gfx::Image* icon) const OVERRIDE;
 
-  virtual void ExecuteCommand(int command_id) OVERRIDE;
+  virtual void ExecuteCommand(int command_id, int event_flags) OVERRIDE;
 
   virtual bool HasIcon(int command_id) OVERRIDE;
 
@@ -54,6 +54,6 @@ class MenuDelegate : public ui::SimpleMenuModel::Delegate {
   DISALLOW_COPY_AND_ASSIGN(MenuDelegate);
 };
 
-}  // namespace api
+}  // namespace nwapi
 
 #endif  // CONTENT_NW_SRC_API_MENU_MENU_DELEGATE_H_

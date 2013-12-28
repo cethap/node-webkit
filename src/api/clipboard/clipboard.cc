@@ -21,12 +21,12 @@
 #include "content/nw/src/api/clipboard/clipboard.h"
 
 #include "base/values.h"
-#include "base/utf_string_conversions.h"
-#include "base/string16.h"
+#include "base/strings/utf_string_conversions.h"
+#include "base/strings/string16.h"
 #include "content/nw/src/api/dispatcher_host.h"
 #include "ui/base/clipboard/clipboard.h"
 
-namespace api {
+namespace nwapi {
 
 Clipboard::Clipboard(int id,
            DispatcherHost* dispatcher_host,
@@ -83,4 +83,4 @@ void Clipboard::Clear() {
   clipboard->Clear(ui::Clipboard::BUFFER_STANDARD);
 }
 
-}  // namespace api
+}  // namespace nwapi

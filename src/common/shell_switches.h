@@ -16,6 +16,7 @@ extern const char kUrl[];
 extern const char kWorkingDirectory[];
 extern const char kNodeMain[];
 extern const char kSnapshot[];
+extern const char kDomStorageQuota[];
 
 // Manifest settings
 extern const char kmMain[];
@@ -46,6 +47,7 @@ extern const char kmAsDesktop[];
 extern const char kmFullscreen[];
 extern const char kmKiosk[];
 extern const char kmAlwaysOnTop[];
+extern const char kmInitialFocus[];
 
 extern const char kmWebgl[];
 extern const char kmJava[];
@@ -54,6 +56,10 @@ extern const char kmPageCache[];
 extern const char kmUserAgent[];
 extern const char kmRemotePages[];
 extern const char kmNewInstance[];
+
+#if defined(OS_WIN)
+extern const char kPrintRaster[];
+#endif
 }  // namespace switches
 
 #endif  // CONTENT_NW_SRC_SHELL_SWITCHES_H_

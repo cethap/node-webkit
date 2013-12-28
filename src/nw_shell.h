@@ -34,6 +34,7 @@
 
 namespace base {
 class DictionaryValue;
+class FilePath;
 }
 
 namespace extensions {
@@ -50,9 +51,12 @@ class Package;
 namespace content {
 
 class BrowserContext;
+class ShellDevToolsFrontend;
 class ShellJavaScriptDialogCreator;
 class SiteInstance;
 class WebContents;
+
+using base::FilePath;
 
 // This represents one window of the Content Shell, i.e. all the UI including
 // buttons and url bar, as well as the web content area.
@@ -79,6 +83,12 @@ class Shell : public WebContentsDelegate,
                        int routing_id,
                        WebContents* base_web_contents);
 
+  // Create a new shell for window.open and Window.open
+  static Shell* Create(WebContents* source_contents,
+                       const GURL& target_url,
+                       base::DictionaryValue* manifest,
+                       WebContents* new_contents);
+
   // Returns the Shell object corresponding to the given RenderViewHost.
   static Shell* FromRenderViewHost(RenderViewHost* rvh);
 
@@ -87,18 +97,23 @@ class Shell : public WebContentsDelegate,
   void Reload(ReloadType type = RELOAD);
   void Stop();
   void ReloadOrStop();
-  void ShowDevTools();
-
+  void ShowDevTools(const char* jail_id = NULL, bool headless = false);
+  void CloseDevTools();
+  bool devToolsOpen() { return devtools_window_.get() != NULL; }
   // Send an event to renderer.
   void SendEvent(const std::string& event, const std::string& arg1 = "");
+  void SendEvent(const std::string& event, const base::ListValue& args);
 
   // Decide whether we should close the window.
-  bool ShouldCloseWindow();
+  bool ShouldCloseWindow(bool quit = false);
+
+  virtual GURL OverrideDOMStorageOrigin(const GURL& origin);
 
   // Print critical error.
   void PrintCriticalError(const std::string& title,
                           const std::string& content);
 
+  int WrapDevToolsWindow();
   // Returns the currently open windows.
   static std::vector<Shell*>& windows() { return windows_; }
 
@@ -133,8 +148,14 @@ class Shell : public WebContentsDelegate,
   virtual bool IsPopupOrPanel(const WebContents* source) const OVERRIDE;
   virtual void WebContentsCreated(WebContents* source_contents,
                                   int64 source_frame_id,
+                                  const string16& frame_name,
                                   const GURL& target_url,
                                   WebContents* new_contents) OVERRIDE;
+#if defined(OS_WIN)
+  virtual void WebContentsFocused(WebContents* contents) OVERRIDE;
+#endif
+  virtual content::ColorChooser* OpenColorChooser(
+      content::WebContents* web_contents, SkColor color) OVERRIDE;
   virtual void RunFileChooser(
       content::WebContents* web_contents,
       const content::FileChooserParams& params) OVERRIDE;
@@ -143,7 +164,7 @@ class Shell : public WebContentsDelegate,
                                   const FilePath& path) OVERRIDE;
   virtual void DidNavigateMainFramePostCommit(
       WebContents* web_contents) OVERRIDE;
-  virtual JavaScriptDialogCreator* GetJavaScriptDialogCreator() OVERRIDE;
+  virtual JavaScriptDialogManager* GetJavaScriptDialogManager() OVERRIDE;
   virtual void RequestToLockMouse(WebContents* web_contents,
                                   bool user_gesture,
                                   bool last_unlocked_by_target) OVERRIDE;
@@ -178,10 +199,12 @@ class Shell : public WebContentsDelegate,
 
   // Weak potiner to devtools window.
   base::WeakPtr<Shell> devtools_window_;
+  base::WeakPtr<Shell> devtools_owner_;
 
-  // Factory to generate weak pointer, used by devtools.
-  base::WeakPtrFactory<Shell> weak_ptr_factory_;
-
+  int devtools_window_id_;
+#if 0
+  ShellDevToolsFrontend* devtools_frontend_;
+#endif
   // Whether this shell is devtools window.
   bool is_devtools_;
 
@@ -201,6 +224,9 @@ class Shell : public WebContentsDelegate,
   static bool quit_message_loop_;
 
   static int exit_code_;
+
+  // Factory to generate weak pointer, used by devtools.
+  base::WeakPtrFactory<Shell> weak_ptr_factory_;
 };
 
 }  // namespace content

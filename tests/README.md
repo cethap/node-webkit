@@ -1,9 +1,14 @@
 ## Prerequisite
 
-node-webkit didn't ship third party node modules required for testing, you
-need to install them with npm:
+* node-webkit didn't ship third party node modules required for testing, you
+need to install them.
+* We use `nw-gyp` to build native modules.
+* We have test cases that need a http server. And we have set up a simple nodejs server with port 8123 and 8124 opened. The http server document root is `tests/server`. You can add ports in `tests/server/server.js`
+
+So please run this:
 
 ````bash
+$ npm install -g nw-gyp
 $ cd src/content/nw/tests
 $ npm install -d
 ````
@@ -19,11 +24,11 @@ $ /path-to-node-webkit src/content/nw/tests
 ## Command line options
 
     $ /path-to-node-webkit src/content/nw/tests --help
-    
+
       Usage: nw-test [options]
-    
+
       Options:
-    
+
         -h, --help             output usage information
         -V, --version          output the version number
         -S, --silent           hide the browser window and quit when done (run silently)
@@ -112,9 +117,9 @@ $ /path-to-node-webkit src/content/nw/tests --grep long-to-run -i
 ````
 
 ## Tips
-in test case `node-remote` we need to open a http server, e.g. apache
-to be the remote site. We use port 80, 8080 for test, and please put `node_remote_test.html`
-to the http server document root.
+in test case like `node-remote`, we need to open a http server 
+to be the remote site. It is automatically opened when we run tests. We use port 8123, 8124 for test.
+The http server document root is `tests/server`. We have put some resources there e.g. `node_remote_test.html`.
 
 ## Native Modules
 When there is a new nw release, We hope you to rebuild native modules.

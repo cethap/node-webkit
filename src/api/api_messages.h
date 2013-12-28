@@ -22,7 +22,7 @@
 #include <string>
 
 #include "base/values.h"
-#include "chrome/common/extensions/draggable_region.h"
+#include "extensions/common/draggable_region.h"
 #include "content/public/common/common_param_traits.h"
 #include "ipc/ipc_message_macros.h"
 
@@ -91,3 +91,15 @@ IPC_MESSAGE_ROUTED1(ShellViewHostMsg_UpdateDraggableRegions,
 // The browser want to open a file.
 IPC_MESSAGE_CONTROL1(ShellViewMsg_Open,
                      std::string /* file name */)
+
+// Tell browser we have to reopen.
+IPC_MESSAGE_CONTROL0(ShellViewMsg_Reopen)
+
+// clear cache on the renderer side
+IPC_MESSAGE_CONTROL0(ShellViewMsg_ClearCache)
+
+// grant the policy permissions
+IPC_SYNC_MESSAGE_ROUTED0_1(ShellViewHostMsg_GrantUniversalPermissions, int)
+
+IPC_SYNC_MESSAGE_ROUTED0_1(ShellViewHostMsg_AllocateId, int)
+

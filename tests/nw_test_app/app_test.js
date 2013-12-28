@@ -38,7 +38,7 @@ exports.createClient = function(options) {
     var client = net.connect({port: client_prot});
     client.setEncoding('utf8');   
    
-    if (options.data != null) {   
+    if (options.data != null) {
     if (options.delay) {
       setTimeout(function(){        
         client.end(JSON.stringify(options.data));
@@ -51,7 +51,7 @@ exports.createClient = function(options) {
     }
     
   }
-  return {'auto': program.auto};
+  return {'auto': program.auto, 'socket': client};
 }
 
 exports.init = function(arg1, arg2) {
@@ -72,11 +72,20 @@ childProcess.prototype.removeConnection = function() {
   }
 }
 
+childProcess.prototype.close = function() {
+  try {
+    this.app.kill();
+    server.removeListener('connection', this.server_connection_cb); 
+  } catch (e) {
+    console.log('error');
+  }
+}
+
 /*
  * options: 
  *   execPath: (string)the path of nw.
  *   appPath: (string)the path of app.
- * 
+ *   args: (array)the args of the app.
  *   end:  (function)we should do the report here, after get child process's result.    
  *           data: JSON object
  *           app: nodejs childProcess.spawn 
@@ -95,12 +104,16 @@ exports.createChildProcess = function(options) {
   var 
       execPath = options.execPath,
       path = options.appPath,
-      exec_argv = [path, '--port', port, '--auto'],
+      exec_argv, 
       app, cb,
       no_connect = options.no_connect || false,
       child = new childProcess();
   
-  
+    if (!options.args)
+	exec_argv = [path, '--port', port, '--auto'];
+    else
+	exec_argv = [path].concat(options.args).concat(['--port', port, '--auto']);
+
   if (!no_connect) {
   
     server.on('connection', cb = function(socket){
@@ -109,12 +122,17 @@ exports.createChildProcess = function(options) {
       child.socket = socket;
       
       socket.on('data', function(data) {
-        options.end(JSON.parse(data), app);
-        server.removeListener('connection', cb);        
+        options.end(JSON.parse(data), app);              
       });
-      
-    }); //server.on()
-    child.server_connection_cb = cb;
+      socket.on('end', function() {
+        //console.log('in app end');
+        server.removeListener('connection', cb); 
+      });
+      socket.on('error', function(e) {
+        //console.log(e);
+      });
+      child.server_connection_cb = cb;
+    }); //server.on()   
   } //if (no_conect)
   
   app = spawn(execPath, exec_argv);

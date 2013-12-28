@@ -32,7 +32,9 @@
   var gui = require('nw.gui');
   var path = require('path');
   var program = require('commander');
- 
+  global.local_server = require('./server/server');
+  var local_server = global.local_server;
+  var list = new Array();
   //socket server
   var net = require('net');
   global.server = net.createServer();
@@ -60,6 +62,8 @@
     .option('-b, --bail', "bail after first test failure")
     .option('-A, --async-only', "force all tests to take a callback (async)")
     .option('-p, --port <port>', "set the port used by socket")
+    .option('-v, --verbose', "show the test case which is running.")
+    .option('-l, --list', "list all test cases")
     .parse([ 'node-webkit', 'nw-test' ].concat(gui.App.argv));
 
   // --silent
@@ -86,7 +90,9 @@
     process.stdout.write = function(data) {
       fs.writeFileSync(program.output, data, 'utf8');
     }
-  
+
+  // --verbose
+  if (program.verbose) global.verbose = true;
   global.auto = true;
 
   global.port = 13013;
@@ -95,42 +101,72 @@
 
   // Call this to set 'describe', 'it' and else.
   mocha.setup('bdd');
-
+  global.tests_dir = 'automatic_tests';
   // Read all test files.
-  var dirs = fs.readdirSync('tests');
-  for (var i = 0; i < dirs.length; ++i) {
-      var test_file_path = path.join('tests', dirs[i], dirs[i] + '.js');
-      var content = fs.readFileSync(test_file_path);
+  var dirs = fs.readdirSync(global.tests_dir);
+  for (var i = 0; i < dirs.length;i++){
+    var test_file_path = path.join(global.tests_dir, dirs[i], 'mocha_test.js');
 
+    if (fs.existsSync(test_file_path)){
+      var content = fs.readFileSync(test_file_path);
+      // Get all the test cases
+      var content_tmp = content + "", content_bet, n, n1 = 0, obj, obj1;
+      obj1 = new Object();
+      obj1.depth = 1;		      
+      
+      while (program.list && content_tmp.length != 0) {  
+          n = content_tmp.search('describe');
+	  if (n == -1)
+	      break;
+	  n1 = content_tmp.search('{');
+          content_bet = (content_tmp + "").slice(n1, n);
+          var c = content_bet.split('{').length - content_bet.split('}').length;
+
+          content_tmp = content_tmp.slice(n);
+          n1 = content_tmp.search('{');
+	  n1 = content_tmp.lastIndexOf(',' ,n1);
+          obj = new Object();                 
+          obj.test_name = content_tmp.slice(10, n1 - 1);
+          content_tmp = content_tmp.slice(n1);
+          obj.depth = obj1.depth + c;
+	 
+	  list.push(obj);
+          obj1 = obj;
+      }
+      
+	
       // Simple wrapped 'eval' to setup tests, so:
       // 1) working directory is the directory of 'index.html'.
       // 2) tests run in window context.
       // 3) global variables in each test are wrapped in its local scope.
       // 4) tests are setup synchronously.
-      eval('(function() {' + content + '})();');
-    }
-
-  // Read app test files.
-  dirs = fs.readdirSync('app_tests');
-  for (var i = 0; i < dirs.length;i++){
-    var test_file_path = path.join('app_tests',dirs[i], 'mocha_test.js');
-   
-    if (fs.existsSync(test_file_path)){   
-      var content = fs.readFileSync(test_file_path);
-      eval('(function() {' + content + '})();');    
+      try {
+        eval('(function() {' + content + '})();');
+      } catch (e) {
+        console.log(e);
+      }
     }
   }
 
+  if (program.list) {
+      for (var i = 0; i < list.length; i++) {
+	  var split = '-';
+	  process.stdout.write(new Array(list[i].depth).join(split) + list[i].test_name + '\n');
+      }
+      process.stdout.write("Report total: " + list.length + '\n');
+      server.close = function(){}
+      server.listen = function() {}
+      process.exit();
+  }
+
+
 
   server.on('listening', function(){
-
-  // Run!
-  if (program.silent)
-    mocha.run(gui.App.quit);
-  else
-    mocha.run();
-   
-
+    // Run!
+    if (program.silent)
+      mocha.run(gui.App.quit);
+    else
+      mocha.run();
   });
 
   server.on('error', function(e){
@@ -141,9 +177,9 @@
       server.listen(global.port);
     }
   });
-      
+
   server.listen(global.port);
-   
+
 
 
 

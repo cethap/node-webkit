@@ -21,8 +21,8 @@
 #include "content/nw/src/media/media_internals.h"
 
 #include "base/memory/scoped_ptr.h"
-#include "base/string16.h"
-#include "base/stringprintf.h"
+#include "base/strings/string16.h"
+#include "base/strings/stringprintf.h"
 #include "content/nw/src/media/media_capture_devices_dispatcher.h"
 #include "content/public/browser/browser_thread.h"
 #include "media/base/media_log.h"
@@ -89,37 +89,6 @@ MediaInternals* MediaInternals::GetInstance() {
 
 MediaInternals::~MediaInternals() {}
 
-void MediaInternals::OnDeleteAudioStream(void* host, int stream_id) {
-}
-
-void MediaInternals::OnSetAudioStreamPlaying(
-    void* host, int stream_id, bool playing) {
-}
-
-void MediaInternals::OnSetAudioStreamStatus(
-    void* host, int stream_id, const std::string& status) {
-}
-
-void MediaInternals::OnSetAudioStreamVolume(
-    void* host, int stream_id, double volume) {
-}
-
-void MediaInternals::OnMediaEvent(
-    int render_process_id, const media::MediaLogEvent& event) {
-}
-
-void MediaInternals::OnCaptureDevicesOpened(
-    int render_process_id,
-    int render_view_id,
-    const content::MediaStreamDevices& devices) {
-}
-
-void MediaInternals::OnCaptureDevicesClosed(
-    int render_process_id,
-    int render_view_id,
-    const content::MediaStreamDevices& devices) {
-}
-
 void MediaInternals::OnAudioCaptureDevicesChanged(
     const content::MediaStreamDevices& devices) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
@@ -135,8 +104,19 @@ void MediaInternals::OnVideoCaptureDevicesChanged(
 void MediaInternals::OnMediaRequestStateChanged(
     int render_process_id,
     int render_view_id,
+    int page_request_id,
     const content::MediaStreamDevice& device,
     content::MediaRequestState state) {
+}
+
+void MediaInternals::OnAudioStreamPlayingChanged(
+                                                 int render_process_id, int render_view_id, int stream_id, bool playing, float power_dbfs, bool clipped) {
+}
+
+void MediaInternals::OnCreatingAudioStream(
+    int render_process_id,
+    int render_view_id) {
+  media_devices_dispatcher_->OnCreatingAudioStream(render_process_id, render_view_id);
 }
 
 scoped_refptr<MediaCaptureDevicesDispatcher>
@@ -145,5 +125,5 @@ MediaInternals::GetMediaCaptureDevicesDispatcher() {
 }
 
 MediaInternals::MediaInternals()
-    : media_devices_dispatcher_(new MediaCaptureDevicesDispatcher()) {
+  : media_devices_dispatcher_(new MediaCaptureDevicesDispatcher()) {
 }

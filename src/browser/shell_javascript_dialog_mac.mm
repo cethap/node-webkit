@@ -22,24 +22,24 @@
 
 #import <Cocoa/Cocoa.h>
 
-#import "base/memory/scoped_nsobject.h"
-#include "base/sys_string_conversions.h"
+#import "base/mac/scoped_nsobject.h"
+#include "base/strings/sys_string_conversions.h"
 #include "content/nw/src/browser/shell_javascript_dialog_creator.h"
 
 // Helper object that receives the notification that the dialog/sheet is
 // going away. Is responsible for cleaning itself up.
 @interface ShellJavaScriptDialogHelper : NSObject<NSAlertDelegate> {
  @private
-  scoped_nsobject<NSAlert> alert_;
+  base::scoped_nsobject<NSAlert> alert_;
   NSTextField* textField_;  // WEAK; owned by alert_
 
   // Copies of the fields in ShellJavaScriptDialog because they're private.
   content::ShellJavaScriptDialogCreator* creator_;
-  content::JavaScriptDialogCreator::DialogClosedCallback callback_;
+  content::JavaScriptDialogManager::DialogClosedCallback callback_;
 }
 
 - (id)initHelperWithCreator:(content::ShellJavaScriptDialogCreator*)creator
-   andCallback:(content::JavaScriptDialogCreator::DialogClosedCallback)callback;
+   andCallback:(content::JavaScriptDialogManager::DialogClosedCallback)callback;
 - (NSAlert*)alert;
 - (NSTextField*)textField;
 - (void)alertDidEnd:(NSAlert*)alert
@@ -52,7 +52,7 @@
 @implementation ShellJavaScriptDialogHelper
 
 - (id)initHelperWithCreator:(content::ShellJavaScriptDialogCreator*)creator
-  andCallback:(content::JavaScriptDialogCreator::DialogClosedCallback)callback {
+  andCallback:(content::JavaScriptDialogManager::DialogClosedCallback)callback {
   if (self = [super init]) {
     creator_ = creator;
     callback_ = callback;
@@ -107,7 +107,7 @@ ShellJavaScriptDialog::ShellJavaScriptDialog(
     JavaScriptMessageType message_type,
     const string16& message_text,
     const string16& default_prompt_text,
-    const JavaScriptDialogCreator::DialogClosedCallback& callback)
+    const JavaScriptDialogManager::DialogClosedCallback& callback)
     : creator_(creator),
       callback_(callback) {
   bool text_field = message_type == JAVASCRIPT_MESSAGE_TYPE_PROMPT;
@@ -126,7 +126,7 @@ ShellJavaScriptDialog::ShellJavaScriptDialog(
   }
   [alert setDelegate:helper_];
   [alert setInformativeText:base::SysUTF16ToNSString(message_text)];
-  [alert setMessageText:@"Javascript alert"];
+  [alert setMessageText:@""];
   [alert addButtonWithTitle:@"OK"];
   if (!one_button) {
     NSButton* other = [alert addButtonWithTitle:@"Cancel"];

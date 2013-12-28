@@ -21,11 +21,11 @@
 #include "content/nw/src/api/menu/menu_delegate_win.h"
 
 #include "base/logging.h"
-#include "base/string16.h"
+#include "base/strings/string16.h"
 #include "content/nw/src/api/dispatcher_host.h"
 #include "content/nw/src/api/menuitem/menuitem.h"
 
-namespace api {
+namespace nwapi {
 
 MenuDelegate::MenuDelegate(DispatcherHost* dispatcher_host)
     : dispatcher_host_(dispatcher_host) {
@@ -47,6 +47,8 @@ bool MenuDelegate::IsCommandIdEnabled(int command_id) const {
     return false;
 
   MenuItem* item = dispatcher_host_->GetApiObject<MenuItem>(command_id);
+  if (!item)
+    return false;
   return item->is_enabled_;
 }
 
@@ -55,6 +57,8 @@ bool MenuDelegate::IsItemForCommandIdDynamic(int command_id) const {
     return false;
 
   MenuItem* item = dispatcher_host_->GetApiObject<MenuItem>(command_id);
+  if (!item)
+    return false;
   return item->is_modified_;
 }
 
@@ -66,6 +70,8 @@ string16 MenuDelegate::GetLabelForCommandId(int command_id) const {
 bool MenuDelegate::GetIconForCommandId(int command_id,
                                        gfx::Image* icon) const {
   MenuItem* item = dispatcher_host_->GetApiObject<MenuItem>(command_id);
+  if (!item)
+    return false;
   if (item->icon_.IsEmpty())
     return false;
 
@@ -73,11 +79,13 @@ bool MenuDelegate::GetIconForCommandId(int command_id,
   return true;
 }
 
-void MenuDelegate::ExecuteCommand(int command_id) {
+void MenuDelegate::ExecuteCommand(int command_id, int event_flags) {
   if (command_id < 0)
     return;
 
   MenuItem* item = dispatcher_host_->GetApiObject<MenuItem>(command_id);
+  if (!item)
+    return;
   item->OnClick();
 }
 
@@ -86,7 +94,9 @@ bool MenuDelegate::HasIcon(int command_id) {
     return false;
 
   MenuItem* item = dispatcher_host_->GetApiObject<MenuItem>(command_id);
+  if (!item)
+    return false;
   return !item->icon_.IsEmpty();
 }
 
-}  // namespace api
+}  // namespace nwapi

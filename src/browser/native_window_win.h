@@ -28,6 +28,7 @@
 #include "ui/gfx/rect.h"
 #include "ui/views/focus/widget_focus_manager.h"
 #include "ui/views/widget/widget_delegate.h"
+#include "ui/views/widget/widget_observer.h"
 
 namespace views {
 class WebView;
@@ -39,9 +40,10 @@ class NativeWindowToolbarWin;
 
 class NativeWindowWin : public NativeWindow,
                         public views::WidgetFocusChangeListener,
-                        public views::WidgetDelegateView {
+                        public views::WidgetDelegateView , 
+                        public views::WidgetObserver {
  public:
-  explicit NativeWindowWin(content::Shell* shell,
+  explicit NativeWindowWin(const base::WeakPtr<content::Shell>& shell,
                            base::DictionaryValue* manifest);
   virtual ~NativeWindowWin();
 
@@ -74,13 +76,16 @@ class NativeWindowWin : public NativeWindow,
   virtual void FlashFrame(bool flash) OVERRIDE;
   virtual void SetKiosk(bool kiosk) OVERRIDE;
   virtual bool IsKiosk() OVERRIDE;
-  virtual void SetMenu(api::Menu* menu) OVERRIDE;
+  virtual void SetMenu(nwapi::Menu* menu) OVERRIDE;
   virtual void SetToolbarButtonEnabled(TOOLBAR_BUTTON button,
                                        bool enabled) OVERRIDE;
   virtual void SetToolbarUrlEntry(const std::string& url) OVERRIDE;
   virtual void SetToolbarIsLoading(bool loading) OVERRIDE;
+  virtual void SetInitialFocus(bool initial_focus) OVERRIDE;
+  virtual bool InitialFocus() OVERRIDE { return initial_focus_; }
 
   // WidgetDelegate implementation.
+  virtual void OnWidgetMove() OVERRIDE;
   virtual views::View* GetContentsView() OVERRIDE;
   virtual views::ClientView* CreateClientView(views::Widget*) OVERRIDE;
   virtual views::NonClientFrameView* CreateNonClientFrameView(
@@ -95,10 +100,14 @@ class NativeWindowWin : public NativeWindow,
   virtual gfx::ImageSkia GetWindowAppIcon() OVERRIDE;
   virtual gfx::ImageSkia GetWindowIcon() OVERRIDE;
   virtual bool ShouldShowWindowTitle() const OVERRIDE;
+  virtual bool ShouldHandleOnSize()    const OVERRIDE;
 
   // WidgetFocusChangeListener implementation.
   virtual void OnNativeFocusChange(gfx::NativeView focused_before,
                                    gfx::NativeView focused_now) OVERRIDE;
+
+  // WidgetObserver implementation
+  virtual void OnWidgetBoundsChanged(views::Widget* widget, const gfx::Rect& new_bounds) OVERRIDE;
 
  protected:
   // NativeWindow implementation.
@@ -111,28 +120,21 @@ class NativeWindowWin : public NativeWindow,
   // views::View implementation.
   virtual void Layout() OVERRIDE;
   virtual void ViewHierarchyChanged(
-      bool is_add, views::View *parent, views::View *child) OVERRIDE;
+      const ViewHierarchyChangedDetails& details) OVERRIDE;
   virtual gfx::Size GetMinimumSize() OVERRIDE;
   virtual gfx::Size GetMaximumSize() OVERRIDE;
   virtual void OnFocus() OVERRIDE;
 
   // views::WidgetDelegate implementation.
   virtual bool ExecuteWindowsCommand(int command_id) OVERRIDE;
+  virtual bool HandleSize(unsigned int param, const gfx::Size& size) OVERRIDE;
   virtual bool ExecuteAppCommand(int command_id) OVERRIDE;
   virtual void SaveWindowPlacement(const gfx::Rect& bounds,
                                    ui::WindowShowState show_state) OVERRIDE;
 
  private:
+  friend class content::Shell;
   void OnViewWasResized();
-
-
-  // Sets |attribute_value_to_set| and/or clears |attribute_value_to_reset| for
-  // the attibute denoted by |attribute_index|. This is used to update the style
-  // or extended style for the native window.
-  void UpdateWindowAttribute(int attribute_index,
-                             int attribute_value_to_set,
-                             int attribute_value_to_reset,
-                             bool update_frame);
 
   NativeWindowToolbarWin* toolbar_;
   views::WebView* web_view_;
@@ -141,18 +143,24 @@ class NativeWindowWin : public NativeWindow,
 
   // Flags used to prevent sending extra events.
   bool is_minimized_;
+  bool is_maximized_;
   bool is_focus_;
   bool is_blur_;
 
   scoped_ptr<SkRegion> draggable_region_;
 
   // The window's menubar.
-  api::Menu* menu_;
+  nwapi::Menu* menu_;
 
   bool resizable_;
   std::string title_;
   gfx::Size minimum_size_;
   gfx::Size maximum_size_;
+
+  bool initial_focus_;
+
+  int last_width_;
+  int last_height_;
 
   DISALLOW_COPY_AND_ASSIGN(NativeWindowWin);
 };

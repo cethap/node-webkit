@@ -22,12 +22,13 @@
 #define CONTENT_NW_SRC_NET_SHELL_URL_REQUEST_CONTEXT_GETTER_H_
 
 #include "base/compiler_specific.h"
-#include "base/file_path.h"
+#include "base/files/file_path.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
+#include "content/public/browser/content_browser_client.h"
 #include "net/url_request/url_request_context_getter.h"
+#include "net/url_request/url_request_job_factory.h"
 
-class MessageLoop;
 
 namespace net {
 class HostResolver;
@@ -36,14 +37,24 @@ class ProxyConfigService;
 class URLRequestContextStorage;
 }
 
+namespace base{
+class MessageLoop;
+}
+
 namespace content {
 
-class ShellURLRequestContextGetter : public net::URLRequestContextGetter {
+class ShellBrowserContext;
+
+ class ShellURLRequestContextGetter : public net::URLRequestContextGetter {
  public:
   ShellURLRequestContextGetter(
-      const FilePath& base_path,
-      MessageLoop* io_loop,
-      MessageLoop* file_loop);
+      bool ignore_certificate_errors,
+      const base::FilePath& data_path,
+      const base::FilePath& root_path,
+      base::MessageLoop* io_loop,
+      base::MessageLoop* file_loop,
+      ProtocolHandlerMap* protocol_handlers,
+      ShellBrowserContext*);
 
   // net::URLRequestContextGetter implementation.
   virtual net::URLRequestContext* GetURLRequestContext() OVERRIDE;
@@ -57,14 +68,17 @@ class ShellURLRequestContextGetter : public net::URLRequestContextGetter {
 
  private:
   bool ignore_certificate_errors_;
-  FilePath base_path_;
-  MessageLoop* io_loop_;
-  MessageLoop* file_loop_;
+  base::FilePath data_path_;
+  base::FilePath root_path_;
+  base::MessageLoop* io_loop_;
+  base::MessageLoop* file_loop_;
 
   scoped_ptr<net::ProxyConfigService> proxy_config_service_;
   scoped_ptr<net::NetworkDelegate> network_delegate_;
   scoped_ptr<net::URLRequestContextStorage> storage_;
   scoped_ptr<net::URLRequestContext> url_request_context_;
+  ProtocolHandlerMap protocol_handlers_;
+  ShellBrowserContext* browser_context_;
 
   DISALLOW_COPY_AND_ASSIGN(ShellURLRequestContextGetter);
 };

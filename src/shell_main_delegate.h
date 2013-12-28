@@ -7,7 +7,7 @@
 
 #include "base/compiler_specific.h"
 #include "base/memory/scoped_ptr.h"
-#include "content/shell/shell_content_client.h"
+#include "content/nw/src/shell_content_client.h"
 #include "content/public/app/content_main_delegate.h"
 
 namespace content {
@@ -28,7 +28,10 @@ class ShellMainDelegate : public ContentMainDelegate {
   virtual ContentBrowserClient* CreateContentBrowserClient() OVERRIDE;
   virtual ContentRendererClient* CreateContentRendererClient() OVERRIDE;
 
-  static void InitializeResourceBundle();
+  static void InitializeResourceBundle(const std::string& pref_locale);
+#if defined(OS_POSIX) && !defined(OS_MACOSX)
+  virtual void ZygoteForked() OVERRIDE;
+#endif
 
  private:
   scoped_ptr<ShellContentBrowserClient> browser_client_;

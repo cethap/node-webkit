@@ -42,26 +42,6 @@ class MediaInternals : public content::MediaObserver {
   static MediaInternals* GetInstance();
 
   // Overridden from content::MediaObserver:
-  virtual void OnDeleteAudioStream(void* host, int stream_id) OVERRIDE;
-  virtual void OnSetAudioStreamPlaying(void* host,
-                                       int stream_id,
-                                       bool playing) OVERRIDE;
-  virtual void OnSetAudioStreamStatus(void* host,
-                                      int stream_id,
-                                      const std::string& status) OVERRIDE;
-  virtual void OnSetAudioStreamVolume(void* host,
-                                      int stream_id,
-                                      double volume) OVERRIDE;
-  virtual void OnMediaEvent(int render_process_id,
-                            const media::MediaLogEvent& event) OVERRIDE;
-  virtual void OnCaptureDevicesOpened(
-      int render_process_id,
-      int render_view_id,
-      const content::MediaStreamDevices& devices) OVERRIDE;
-  virtual void OnCaptureDevicesClosed(
-      int render_process_id,
-      int render_view_id,
-      const content::MediaStreamDevices& devices) OVERRIDE;
   virtual void OnAudioCaptureDevicesChanged(
       const content::MediaStreamDevices& devices) OVERRIDE;
   virtual void OnVideoCaptureDevicesChanged(
@@ -69,8 +49,18 @@ class MediaInternals : public content::MediaObserver {
   virtual void OnMediaRequestStateChanged(
       int render_process_id,
       int render_view_id,
+      int page_request_id,
       const content::MediaStreamDevice& device,
       content::MediaRequestState state) OVERRIDE;
+  virtual void OnAudioStreamPlayingChanged(
+      int render_process_id,
+      int render_view_id,
+      int stream_id,
+      bool playing,
+      float power_dbfs,
+      bool clipped) OVERRIDE;
+  virtual void OnCreatingAudioStream(int render_process_id,
+                                     int render_view_id) OVERRIDE;
 
   // Methods for observers.
   // Observers should add themselves on construction and remove themselves

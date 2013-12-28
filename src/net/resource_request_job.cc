@@ -24,9 +24,9 @@
 #include "base/compiler_specific.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
-#include "base/message_loop.h"
+#include "base/message_loop/message_loop.h"
 #include "base/logging.h"
-#include "googleurl/src/gurl.h"
+#include "url/gurl.h"
 #include "net/base/io_buffer.h"
 #include "net/base/net_errors.h"
 #include "net/http/http_response_headers.h"
@@ -34,6 +34,8 @@
 #include "net/url_request/url_request_job.h"
 #include "grit/nw_resources.h"
 #include "ui/base/resource/resource_bundle.h"
+
+using base::MessageLoop;
 
 namespace nw {
 
@@ -47,7 +49,7 @@ ResourceRequestJob::ResourceRequestJob(
       pending_buf_size_(0),
       mime_type_(mime_type),
       resource_id_(resource_id),
-      ALLOW_THIS_IN_INITIALIZER_LIST(weak_factory_(this)) {
+      weak_factory_(this) {
 }
 
 // static

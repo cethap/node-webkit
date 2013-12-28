@@ -36,7 +36,11 @@ namespace WebKit {
 class WebFrame;
 }
 
-namespace api {
+namespace content {
+class Shell;
+}
+
+namespace nwapi {
 
 class Base;
 
@@ -48,11 +52,14 @@ class DispatcherHost : public content::RenderViewHostObserver {
   // Get C++ object from its id.
   Base* GetApiObject(int id);
 
+  static int AllocateId();
   // Helper function to convert type.
   template<class T>
   T* GetApiObject(int id) {
     return static_cast<T*>(GetApiObject(id));
   }
+
+  static void ClearObjectRegistry();
 
   // Send event to C++ object's corresponding js object.
   void SendEvent(Base* object,
@@ -65,7 +72,10 @@ class DispatcherHost : public content::RenderViewHostObserver {
   }
 
  private:
-  IDMap<Base, IDMapOwnPointer> objects_registry_;
+  friend class content::Shell;
+
+  static IDMap<Base, IDMapOwnPointer> objects_registry_;
+  static int next_object_id_;
 
   // RenderViewHostObserver implementation.
   virtual bool OnMessageReceived(const IPC::Message& message) OVERRIDE;
@@ -95,10 +105,13 @@ class DispatcherHost : public content::RenderViewHostObserver {
   void OnCreateShell(const std::string& url,
                      const base::DictionaryValue& manifest,
                      int* routing_id);
-
+  void OnGrantUniversalPermissions(int* ret);
+  void OnAllocateId(int* ret);
   DISALLOW_COPY_AND_ASSIGN(DispatcherHost);
 };
 
-}  // namespace api
+nwapi::DispatcherHost* FindDispatcherHost(content::RenderViewHost* render_view_host);
+
+}  // namespace nwapi
 
 #endif  // CONTENT_NW_SRC_API_DISPATCHER_HOST_H_

@@ -23,8 +23,8 @@
 #include <gtk/gtk.h>
 
 #include "base/logging.h"
-#include "base/string_util.h"
-#include "base/utf_string_conversions.h"
+#include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "content/nw/src/browser/shell_javascript_dialog_creator.h"
 #include "content/nw/src/resource.h"
 #include "content/nw/src/nw_shell.h"
@@ -54,7 +54,7 @@ ShellJavaScriptDialog::ShellJavaScriptDialog(
     JavaScriptMessageType message_type,
     const string16& message_text,
     const string16& default_prompt_text,
-    const JavaScriptDialogCreator::DialogClosedCallback& callback)
+    const JavaScriptDialogManager::DialogClosedCallback& callback)
     : creator_(creator),
       callback_(callback),
       parent_window_(parent_window) {

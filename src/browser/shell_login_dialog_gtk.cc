@@ -23,8 +23,8 @@
 #include <gtk/gtk.h>
 
 #include "base/logging.h"
-#include "base/string16.h"
-#include "base/utf_string_conversions.h"
+#include "base/strings/string16.h"
+#include "base/strings/utf_string_conversions.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/resource_dispatcher_host.h"
@@ -94,16 +94,26 @@ void ShellLoginDialog::PlatformCreateDialog(const string16& message) {
   gtk_box_pack_start(GTK_BOX(content_area), table, FALSE, FALSE, 0);
 
   g_signal_connect(root_, "response", G_CALLBACK(OnResponseThunk), this);
+  g_signal_connect(root_, "destroy",  G_CALLBACK(OnDestroyThunk), this);
+
   gtk_widget_grab_focus(username_entry_);
-  gtk_widget_show_all(GTK_WIDGET(root_));
 }
 
 void ShellLoginDialog::PlatformCleanUp() {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  if (root_) {
+    gtk_widget_destroy(root_);
+    root_ = NULL;
+  }
 }
 
 void ShellLoginDialog::PlatformRequestCancelled() {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+}
+
+void ShellLoginDialog::PlatformShowDialog() {
+  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  gtk_widget_show_all(GTK_WIDGET(root_));
 }
 
 void ShellLoginDialog::OnResponse(GtkWidget* sender, int response_id) {
@@ -121,7 +131,15 @@ void ShellLoginDialog::OnResponse(GtkWidget* sender, int response_id) {
       NOTREACHED();
   }
 
-  gtk_widget_destroy(root_);
+}
+
+void ShellLoginDialog::OnDestroy(GtkWidget* widget) {
+  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+
+  // The web contents modal dialog is going to delete itself; clear our pointer.
+  root_ = NULL;
+
+  ReleaseSoon();
 }
 
 }  // namespace content

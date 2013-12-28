@@ -42,6 +42,7 @@ const char kNodeMain[] = "node-main";
 
 // snapshot file path
 const char kSnapshot[] = "snapshot";
+const char kDomStorageQuota[] = "ds-quota";
 
 const char kmMain[]   = "main";
 const char kmName[]   = "name";
@@ -70,6 +71,7 @@ const char kmMaxHeight[]  = "max_height";
 const char kmResizable[]  = "resizable";
 const char kmAsDesktop[]  = "as_desktop";
 const char kmFullscreen[] = "fullscreen";
+const char kmInitialFocus[] = "focus";
 
 // Start with the kiosk mode, see Opera's page for description:
 // http://www.opera.com/support/mastering/kiosk/
@@ -96,5 +98,10 @@ const char kmUserAgent[] = "user-agent";
 const char kmRemotePages[] = "node-remote";
 
 const char kmNewInstance[] = "new-instance";
+
+#if defined(OS_WIN)
+// Enable conversion from vector to raster for any page.
+const char kPrintRaster[] = "print-raster";
+#endif
 
 }  // namespace switches

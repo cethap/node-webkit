@@ -20,7 +20,7 @@
 
 #include "content/nw/src/api/menu/menu.h"
 
-#include "base/message_loop.h"
+#include "base/message_loop/message_loop.h"
 #include "base/mac/scoped_sending_event.h"
 #include "base/values.h"
 #import <Cocoa/Cocoa.h>
@@ -30,7 +30,7 @@
 #include "content/nw/src/browser/native_window_mac.h"
 #include "content/nw/src/nw_shell.h"
 
-namespace api {
+namespace nwapi {
 
 void Menu::Create(const base::DictionaryValue& option) {
   menu_ = [[NSMenu alloc] initWithTitle:@"NW Menu"];
@@ -80,7 +80,7 @@ void Menu::Popup(int x, int y, content::Shell* shell) {
 
   {
     // Make sure events can be pumped while the menu is up.
-    MessageLoop::ScopedNestableTaskAllower allow(MessageLoop::current());
+    base::MessageLoop::ScopedNestableTaskAllower allow(base::MessageLoop::current());
 
     // One of the events that could be pumped is |window.close()|.
     // User-initiated event-tracking loops protect against this by
@@ -96,4 +96,4 @@ void Menu::Popup(int x, int y, content::Shell* shell) {
   }
 }
 
-}  // namespace api
+}  // namespace nwapi

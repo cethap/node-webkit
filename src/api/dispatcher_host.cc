@@ -1,16 +1,16 @@
 // Copyright (c) 2012 Intel Corp
 // Copyright (c) 2012 The Chromium Authors
-// 
-// Permission is hereby granted, free of charge, to any person obtaining a copy 
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 //  in the Software without restriction, including without limitation the rights
 //  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell co
 // pies of the Software, and to permit persons to whom the Software is furnished
 //  to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in al
 // l copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IM
 // PLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNES
 // S FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
@@ -21,7 +21,9 @@
 #include "content/nw/src/api/dispatcher_host.h"
 
 #include "base/logging.h"
+#include "base/threading/thread_restrictions.h"
 #include "base/values.h"
+#include "content/browser/child_process_security_policy_impl.h"
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/nw/src/api/api_messages.h"
 #include "content/nw/src/api/app/app.h"
@@ -39,18 +41,42 @@
 
 using content::WebContents;
 using content::ShellBrowserContext;
+using content::Shell;
 
-namespace api {
+namespace nwapi {
+
+IDMap<Base, IDMapOwnPointer> nwapi::DispatcherHost::objects_registry_;
+int nwapi::DispatcherHost::next_object_id_ = 1;
+static std::map<content::RenderViewHost*, DispatcherHost*> g_dispatcher_host_map;
 
 DispatcherHost::DispatcherHost(content::RenderViewHost* render_view_host)
     : content::RenderViewHostObserver(render_view_host) {
+  g_dispatcher_host_map[render_view_host] = this;
 }
 
 DispatcherHost::~DispatcherHost() {
+  g_dispatcher_host_map.erase(render_view_host());
+}
+
+DispatcherHost*
+FindDispatcherHost(content::RenderViewHost* render_view_host) {
+  std::map<content::RenderViewHost*, DispatcherHost*>::iterator it
+    = g_dispatcher_host_map.find(render_view_host);
+  if (it == g_dispatcher_host_map.end())
+    return NULL;
+  return it->second;
+}
+
+void DispatcherHost::ClearObjectRegistry() {
+  objects_registry_.Clear();
 }
 
 Base* DispatcherHost::GetApiObject(int id) {
-  return objects_registry_.Lookup(id); 
+  return objects_registry_.Lookup(id);
+}
+
+int DispatcherHost::AllocateId() {
+  return next_object_id_++;
 }
 
 void DispatcherHost::SendEvent(Base* object,
@@ -66,6 +92,8 @@ bool DispatcherHost::Send(IPC::Message* message) {
 
 bool DispatcherHost::OnMessageReceived(const IPC::Message& message) {
   bool handled = true;
+  base::ThreadRestrictions::ScopedAllowIO allow_io;
+  base::ThreadRestrictions::ScopedAllowWait allow_wait;
   IPC_BEGIN_MESSAGE_MAP(DispatcherHost, message)
     IPC_MESSAGE_HANDLER(ShellViewHostMsg_Allocate_Object, OnAllocateObject)
     IPC_MESSAGE_HANDLER(ShellViewHostMsg_Deallocate_Object, OnDeallocateObject)
@@ -79,6 +107,8 @@ bool DispatcherHost::OnMessageReceived(const IPC::Message& message) {
                         OnUncaughtException);
     IPC_MESSAGE_HANDLER(ShellViewHostMsg_GetShellId, OnGetShellId);
     IPC_MESSAGE_HANDLER(ShellViewHostMsg_CreateShell, OnCreateShell);
+    IPC_MESSAGE_HANDLER(ShellViewHostMsg_GrantUniversalPermissions, OnGrantUniversalPermissions);
+    IPC_MESSAGE_HANDLER(ShellViewHostMsg_AllocateId, OnAllocateId);
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
 
@@ -105,7 +135,7 @@ void DispatcherHost::OnAllocateObject(int object_id,
   } else if (type == "Window") {
     objects_registry_.AddWithID(new Window(object_id, this, option), object_id);
   } else {
-    LOG(ERROR) << "Allocate an object of unknow type: " << type;
+    LOG(ERROR) << "Allocate an object of unknown type: " << type;
     objects_registry_.AddWithID(new Base(object_id, this, option), object_id);
   }
 }
@@ -126,8 +156,13 @@ void DispatcherHost::OnCallObjectMethod(
              << " arguments:" << arguments;
 
   Base* object = GetApiObject(object_id);
-  DCHECK(object) << "Unknown object: " << object_id;
-  object->Call(method, arguments);
+  if (object)
+    object->Call(method, arguments);
+  else
+    DLOG(WARNING) << "Unknown object: " << object_id
+             << " type:" << type
+             << " method:" << method
+             << " arguments:" << arguments;
 }
 
 void DispatcherHost::OnCallObjectMethodSync(
@@ -142,8 +177,12 @@ void DispatcherHost::OnCallObjectMethodSync(
              << " arguments:" << arguments;
 
   Base* object = GetApiObject(object_id);
-  DCHECK(object) << "Unknown object: " << object_id;
-  object->CallSync(method, arguments, result);
+  LOG(WARNING) << "Unknown object: " << object_id
+             << " type:" << type
+             << " method:" << method
+             << " arguments:" << arguments;
+  if (object)
+    object->CallSync(method, arguments, result);
 }
 
 void DispatcherHost::OnCallStaticMethod(
@@ -156,10 +195,10 @@ void DispatcherHost::OnCallStaticMethod(
              << " arguments:" << arguments;
 
   if (type == "Shell") {
-    api::Shell::Call(method, arguments);
+    nwapi::Shell::Call(method, arguments);
     return;
   } else if (type == "App") {
-    api::App::Call(method, arguments);
+    nwapi::App::Call(method, arguments);
     return;
   }
 
@@ -177,9 +216,9 @@ void DispatcherHost::OnCallStaticMethodSync(
              << " arguments:" << arguments;
 
   if (type == "App") {
-    content::Shell* shell = 
+    content::Shell* shell =
         content::Shell::FromRenderViewHost(render_view_host());
-    api::App::Call(shell, method, arguments, result);
+    nwapi::App::Call(shell, method, arguments, result);
     return;
   }
 
@@ -187,13 +226,13 @@ void DispatcherHost::OnCallStaticMethodSync(
 }
 
 void DispatcherHost::OnUncaughtException(const std::string& err) {
-  content::Shell* shell = 
+  content::Shell* shell =
       content::Shell::FromRenderViewHost(render_view_host());
   shell->PrintCriticalError("Uncaught node.js Error", err);
 }
 
 void DispatcherHost::OnGetShellId(int* id) {
-  content::Shell* shell = 
+  content::Shell* shell =
       content::Shell::FromRenderViewHost(render_view_host());
   *id = shell->id();
 }
@@ -217,17 +256,40 @@ void DispatcherHost::OnCreateShell(const std::string& url,
   WebContents* web_contents = content::WebContentsImpl::CreateWithOpener(
       create_params,
       static_cast<content::WebContentsImpl*>(base_web_contents));
-  new content::Shell(web_contents, new_manifest.get());
-  web_contents->GetController().LoadURL(
-      GURL(url),
-      content::Referrer(),
-      content::PAGE_TRANSITION_TYPED,
-      std::string());
+  content::Shell* new_shell =
+    content::Shell::Create(base_web_contents,
+                           GURL(url),
+                           new_manifest.get(),
+                           web_contents);
 
-  if (new_renderer)
+  if (new_renderer) {
     browser_context->set_pinning_renderer(true);
+    // since the new-instance shell is always bound
+    // there would be 'Close' event cannot reach dest
+    new_shell->set_force_close(true);
+  }
 
   *routing_id = web_contents->GetRoutingID();
+
+  int object_id = 0;
+  if (new_manifest->GetInteger("object_id", &object_id)) {
+    DispatcherHost* dhost = FindDispatcherHost(web_contents->GetRenderViewHost());
+    dhost->OnAllocateObject(object_id, "Window", *new_manifest.get());
+  }
 }
 
-}  // namespace api
+void DispatcherHost::OnGrantUniversalPermissions(int *ret) {
+  content::Shell* shell =
+      content::Shell::FromRenderViewHost(render_view_host());
+  if (shell->nodejs()) {
+    content::ChildProcessSecurityPolicy::GetInstance()->GrantUniversalAccess(shell->web_contents()->GetRenderProcessHost()->GetID());
+    *ret = 1;
+  }else
+    *ret = 0;
+}
+
+void DispatcherHost::OnAllocateId(int * ret) {
+  *ret = AllocateId();
+}
+
+}  // namespace nwapi

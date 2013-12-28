@@ -1,16 +1,16 @@
 // Copyright (c) 2012 Intel Corp
 // Copyright (c) 2012 The Chromium Authors
-// 
-// Permission is hereby granted, free of charge, to any person obtaining a copy 
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 //  in the Software without restriction, including without limitation the rights
 //  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell co
 // pies of the Software, and to permit persons to whom the Software is furnished
 //  to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in al
 // l copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IM
 // PLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNES
 // S FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
@@ -20,22 +20,33 @@
 
 #include "content/nw/src/shell_content_browser_client.h"
 
+#include "base/base_switches.h"
 #include "base/command_line.h"
-#include "base/file_path.h"
+#include "base/files/file_path.h"
 #include "base/file_util.h"
-#include "base/string_util.h"
+#include "base/strings/string_util.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/values.h"
+#include "chrome/common/child_process_logging.h"
+#include "content/browser/child_process_security_policy_impl.h"
+#include "content/nw/src/browser/printing/printing_message_filter.h"
 #include "content/public/browser/browser_url_handler.h"
+#include "content/public/browser/compositor_util.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/resource_dispatcher_host.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/common/content_descriptors.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/renderer_preferences.h"
+#include "content/public/common/url_constants.h"
 #include "content/nw/src/api/dispatcher_host.h"
+#include "content/nw/src/breakpad_mac.h"
 #include "content/nw/src/common/shell_switches.h"
+#include "content/nw/src/browser/printing/print_job_manager.h"
 #include "content/nw/src/browser/shell_devtools_delegate.h"
+#include "content/nw/src/shell_quota_permission_context.h"
 #include "content/nw/src/browser/shell_resource_dispatcher_host_delegate.h"
 #include "content/nw/src/media/media_internals.h"
 #include "content/nw/src/nw_package.h"
@@ -44,16 +55,52 @@
 #include "content/nw/src/shell_browser_context.h"
 #include "content/nw/src/shell_browser_main_parts.h"
 #include "geolocation/shell_access_token_store.h"
-#include "googleurl/src/gurl.h"
-#include "webkit/glue/webpreferences.h"
-#include "webkit/user_agent/user_agent_util.h"
+#include "url/gurl.h"
 #include "ui/base/l10n/l10n_util.h"
-#include "webkit/plugins/npapi/plugin_list.h"
+#include "ui/base/ui_base_switches.h"
+#include "content/common/dom_storage/dom_storage_map.h"
+#include "webkit/common/webpreferences.h"
+#include "webkit/common/user_agent/user_agent_util.h"
+#include "content/common/plugin_list.h"
+#include "content/public/browser/plugin_service.h"
+
+#if defined(OS_LINUX)
+#include "base/linux_util.h"
+#include "content/nw/src/crash_handler_host_linux.h"
+#endif
+
+using base::FileDescriptor;
+
+namespace {
+
+#if defined(OS_POSIX) && !defined(OS_MACOSX)
+int GetCrashSignalFD(const CommandLine& command_line) {
+  std::string process_type =
+      command_line.GetSwitchValueASCII(switches::kProcessType);
+
+  if (process_type == switches::kRendererProcess)
+    return RendererCrashHandlerHostLinux::GetInstance()->GetDeathSignalSocket();
+
+  if (process_type == switches::kPluginProcess)
+    return PluginCrashHandlerHostLinux::GetInstance()->GetDeathSignalSocket();
+
+  if (process_type == switches::kPpapiPluginProcess)
+    return PpapiCrashHandlerHostLinux::GetInstance()->GetDeathSignalSocket();
+
+  if (process_type == switches::kGpuProcess)
+    return GpuCrashHandlerHostLinux::GetInstance()->GetDeathSignalSocket();
+
+  return -1;
+}
+#endif  // defined(OS_POSIX) && !defined(OS_MACOSX)
+
+}
 
 namespace content {
 
 ShellContentBrowserClient::ShellContentBrowserClient()
-    : shell_browser_main_parts_(NULL) {
+  : shell_browser_main_parts_(NULL),
+    master_rph_(NULL) {
 }
 
 ShellContentBrowserClient::~ShellContentBrowserClient() {
@@ -65,7 +112,7 @@ BrowserMainParts* ShellContentBrowserClient::CreateBrowserMainParts(
   return shell_browser_main_parts_;
 }
 
-WebContentsView* ShellContentBrowserClient::OverrideCreateWebContentsView(
+WebContentsViewPort* ShellContentBrowserClient::OverrideCreateWebContentsView(
       WebContents* web_contents,
       RenderViewHostDelegateView** render_view_host_delegate_view) {
   std::string user_agent, rules;
@@ -84,40 +131,67 @@ WebContentsView* ShellContentBrowserClient::OverrideCreateWebContentsView(
   }
   if (package->root()->GetString(switches::kmRemotePages, &rules))
       prefs->nw_remote_page_rules = rules;
+
+  prefs->nw_app_root_path = package->path();
   return NULL;
 }
 
-void ShellContentBrowserClient::RenderViewHostCreated(
-    RenderViewHost* render_view_host) {
-  new api::DispatcherHost(render_view_host);
-}
-
 std::string ShellContentBrowserClient::GetApplicationLocale() {
-  return l10n_util::GetApplicationLocale("en-US");
+  CommandLine* cmd_line = CommandLine::ForCurrentProcess();
+  std::string pref_locale;
+  if (cmd_line->HasSwitch(switches::kLang)) {
+    pref_locale = cmd_line->GetSwitchValueASCII(switches::kLang);
+  }
+  return l10n_util::GetApplicationLocale(pref_locale);
 }
 
 void ShellContentBrowserClient::AppendExtraCommandLineSwitches(
     CommandLine* command_line,
     int child_process_id) {
+#if defined(OS_MACOSX)
+  if (IsCrashReporterEnabled()) {
+    command_line->AppendSwitchASCII(switches::kEnableCrashReporter,
+                                    child_process_logging::GetClientId());
+  }
+#elif defined(OS_POSIX)
+  if (IsCrashReporterEnabled()) {
+    command_line->AppendSwitchASCII(switches::kEnableCrashReporter,
+        child_process_logging::GetClientId() + "," + base::GetLinuxDistro());
+  }
+
+#endif  // OS_MACOSX
+
   if (command_line->GetSwitchValueASCII("type") != "renderer")
     return;
-  if (child_process_id > 0) {
-    content::RenderProcessHost* rph =
-      content::RenderProcessHost::FromID(child_process_id);
 
-    content::RenderProcessHost::RenderWidgetHostsIterator iter(
-      rph->GetRenderWidgetHostsIterator());
-    for (; !iter.IsAtEnd(); iter.Advance()) {
-      const content::RenderWidgetHost* widget = iter.GetCurrentValue();
-      DCHECK(widget);
-      if (!widget || !widget->IsRenderView())
+  if (content::IsThreadedCompositingEnabled())
+    command_line->AppendSwitch(switches::kEnableThreadedCompositing);
+
+  if (child_process_id > 0) {
+    content::RenderWidgetHost::List widgets =
+      content::RenderWidgetHost::GetRenderWidgetHosts();
+    for (size_t i = 0; i < widgets.size(); ++i) {
+      if (widgets[i]->GetProcess()->GetID() != child_process_id)
         continue;
+      if (!widgets[i]->IsRenderView())
+        continue;
+
+      const content::RenderWidgetHost* widget = widgets[i];
+      DCHECK(widget);
 
       content::RenderViewHost* host = content::RenderViewHost::From(
         const_cast<content::RenderWidgetHost*>(widget));
       content::Shell* shell = content::Shell::FromRenderViewHost(host);
-      if (shell && (shell->is_devtools() || !shell->nodejs()))
-        return;
+      if (shell) {
+        if (!shell->nodejs())
+          return;
+        if (shell->is_devtools()) {
+          // DevTools should have powerful permissions to load local
+          // files by XHR (e.g. for source map)
+          command_line->AppendSwitch(switches::kNodejs);
+          return;
+        }
+      }
     }
   }
   nw::Package* package = shell_browser_main_parts()->package();
@@ -137,6 +211,12 @@ void ShellContentBrowserClient::AppendExtraCommandLineSwitches(
     std::string snapshot_path;
     if (package->root()->GetString(switches::kSnapshot, &snapshot_path))
       command_line->AppendSwitchASCII(switches::kSnapshot, snapshot_path);
+
+    int dom_storage_quota_mb;
+    if (package->root()->GetInteger("dom_storage_quota", &dom_storage_quota_mb)) {
+      content::DOMStorageMap::SetQuotaOverride(dom_storage_quota_mb * 1024 * 1024);
+      command_line->AppendSwitchASCII(switches::kDomStorageQuota, base::IntToString(dom_storage_quota_mb));
+    }
   }
 
   // without the switch, the destructor of the shell object will
@@ -147,6 +227,7 @@ void ShellContentBrowserClient::AppendExtraCommandLineSwitches(
 #if defined(OS_POSIX)
   command_line->AppendSwitch(switches::kChildCleanExit);
 #endif
+
 }
 
 void ShellContentBrowserClient::ResourceDispatcherHostCreated() {
@@ -178,19 +259,19 @@ ShellBrowserContext*
 }
 
 AccessTokenStore* ShellContentBrowserClient::CreateAccessTokenStore() {
-  return new ShellAccessTokenStore(browser_context()->GetRequestContext());
+  return new ShellAccessTokenStore(browser_context());
 }
 
 void ShellContentBrowserClient::OverrideWebkitPrefs(
       RenderViewHost* render_view_host,
       const GURL& url,
-      webkit_glue::WebPreferences* prefs) {
+      WebPreferences* prefs) {
   nw::Package* package = shell_browser_main_parts()->package();
 
   // Disable web security.
   prefs->dom_paste_enabled = true;
   prefs->javascript_can_access_clipboard = true;
-  prefs->web_security_enabled = false;
+  prefs->web_security_enabled = true;
   prefs->allow_file_access_from_file_urls = true;
 
   // Open experimental features.
@@ -201,18 +282,17 @@ void ShellContentBrowserClient::OverrideWebkitPrefs(
   // Disable plugins and cache by default.
   prefs->plugins_enabled = false;
   prefs->java_enabled = false;
-  prefs->uses_page_cache = false;
 
   base::DictionaryValue* webkit;
   if (package->root()->GetDictionary(switches::kmWebkit, &webkit)) {
     webkit->GetBoolean(switches::kmJava, &prefs->java_enabled);
     webkit->GetBoolean(switches::kmPlugin, &prefs->plugins_enabled);
-    webkit->GetBoolean(switches::kmPageCache, &prefs->uses_page_cache);
     FilePath plugins_dir = package->path();
     //PathService::Get(base::DIR_CURRENT, &plugins_dir);
     plugins_dir = plugins_dir.AppendASCII("plugins");
 
-    webkit::npapi::PluginList::Singleton()->AddExtraPluginDir(plugins_dir);
+    PluginService* plugin_service = PluginService::GetInstance();
+    plugin_service->AddExtraPluginDir(plugins_dir);
   }
 }
 
@@ -228,7 +308,123 @@ bool ShellContentBrowserClient::ShouldTryToUseExistingProcessHost(
 
 bool ShellContentBrowserClient::IsSuitableHost(RenderProcessHost* process_host,
                                           const GURL& site_url) {
-  return true;
+  return process_host == master_rph_;
+}
+
+net::URLRequestContextGetter* ShellContentBrowserClient::CreateRequestContext(
+    BrowserContext* content_browser_context,
+    ProtocolHandlerMap* protocol_handlers) {
+  ShellBrowserContext* shell_browser_context =
+      ShellBrowserContextForBrowserContext(content_browser_context);
+  return shell_browser_context->CreateRequestContext(protocol_handlers);
+}
+
+net::URLRequestContextGetter*
+ShellContentBrowserClient::CreateRequestContextForStoragePartition(
+    BrowserContext* content_browser_context,
+    const base::FilePath& partition_path,
+    bool in_memory,
+    ProtocolHandlerMap* protocol_handlers) {
+  ShellBrowserContext* shell_browser_context =
+      ShellBrowserContextForBrowserContext(content_browser_context);
+  return shell_browser_context->CreateRequestContextForStoragePartition(
+      partition_path, in_memory, protocol_handlers);
+}
+
+
+ShellBrowserContext*
+ShellContentBrowserClient::ShellBrowserContextForBrowserContext(
+    BrowserContext* content_browser_context) {
+  if (content_browser_context == browser_context())
+    return browser_context();
+  DCHECK_EQ(content_browser_context, off_the_record_browser_context());
+  return off_the_record_browser_context();
+}
+
+printing::PrintJobManager* ShellContentBrowserClient::print_job_manager() {
+  return shell_browser_main_parts_->print_job_manager();
+}
+
+void ShellContentBrowserClient::RenderProcessHostCreated(
+    RenderProcessHost* host) {
+  int id = host->GetID();
+  if (!master_rph_)
+    master_rph_ = host;
+  // Grant file: scheme to the whole process, since we impose
+  // per-view access checks.
+  content::ChildProcessSecurityPolicy::GetInstance()->GrantScheme(
+      host->GetID(), chrome::kFileScheme);
+  content::ChildProcessSecurityPolicy::GetInstance()->GrantScheme(
+      host->GetID(), "app");
+
+#if defined(ENABLE_PRINTING)
+  host->GetChannel()->AddFilter(new PrintingMessageFilter(id));
+#endif
+}
+
+bool ShellContentBrowserClient::IsHandledURL(const GURL& url) {
+  if (!url.is_valid())
+    return false;
+  DCHECK_EQ(url.scheme(), StringToLowerASCII(url.scheme()));
+  // Keep in sync with ProtocolHandlers added by
+  // ShellURLRequestContextGetter::GetURLRequestContext().
+  static const char* const kProtocolList[] = {
+    chrome::kFileSystemScheme,
+    chrome::kFileScheme,
+    "app",
+  };
+  for (size_t i = 0; i < arraysize(kProtocolList); ++i) {
+    if (url.scheme() == kProtocolList[i])
+      return true;
+  }
+  return false;
+}
+
+void ShellContentBrowserClient::AllowCertificateError(
+    int render_process_id,
+    int render_view_id,
+    int cert_error,
+    const net::SSLInfo& ssl_info,
+    const GURL& request_url,
+    ResourceType::Type resource_type,
+    bool overridable,
+    bool strict_enforcement,
+    const base::Callback<void(bool)>& callback,
+    content::CertificateRequestResultType* result) {
+  VLOG(1) << "AllowCertificateError: " << request_url;
+  CommandLine* cmd_line = CommandLine::ForCurrentProcess();
+  if (cmd_line->HasSwitch(switches::kIgnoreCertificateErrors)) {
+    *result = content::CERTIFICATE_REQUEST_RESULT_TYPE_CONTINUE;
+  }
+  else
+    *result = content::CERTIFICATE_REQUEST_RESULT_TYPE_DENY;
+  return;
+}
+
+void ShellContentBrowserClient::GetAdditionalAllowedSchemesForFileSystem(
+    std::vector<std::string>* additional_allowed_schemes) {
+  ContentBrowserClient::GetAdditionalAllowedSchemesForFileSystem(
+      additional_allowed_schemes);
+  additional_allowed_schemes->push_back("app");
+}
+
+#if defined(OS_POSIX) && !defined(OS_MACOSX)
+void ShellContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
+    const CommandLine& command_line,
+    int child_process_id,
+    std::vector<FileDescriptorInfo>* mappings) {
+  int crash_signal_fd = GetCrashSignalFD(command_line);
+  if (crash_signal_fd >= 0) {
+    mappings->push_back(FileDescriptorInfo(kCrashDumpSignal,
+                                           FileDescriptor(crash_signal_fd,
+                                                          false)));
+  }
+}
+#endif  // defined(OS_POSIX) && !defined(OS_MACOSX)
+
+QuotaPermissionContext*
+ShellContentBrowserClient::CreateQuotaPermissionContext() {
+  return new ShellQuotaPermissionContext();
 }
 
 }  // namespace content

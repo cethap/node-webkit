@@ -20,12 +20,13 @@
 
 #include "content/nw/src/shell_content_client.h"
 
-#include "base/string_piece.h"
+#include "base/strings/string_piece.h"
 #include "content/nw/src/api/api_messages.h"
+#include "content/nw/src/nw_version.h"
 #include "content/nw/src/renderer/common/render_messages.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
-#include "webkit/user_agent/user_agent_util.h"
+#include "webkit/common/user_agent/user_agent_util.h"
 
 namespace content {
 
@@ -33,7 +34,7 @@ ShellContentClient::~ShellContentClient() {
 }
 
 std::string ShellContentClient::GetUserAgent() const {
-  return webkit_glue::BuildUserAgentFromProduct("Chrome/26.0.1377.0");
+  return webkit_glue::BuildUserAgentFromProduct("Chrome/" CHROME_VERSION);
 }
 
 string16 ShellContentClient::GetLocalizedString(int message_id) const {
@@ -43,7 +44,13 @@ string16 ShellContentClient::GetLocalizedString(int message_id) const {
 base::StringPiece ShellContentClient::GetDataResource(
     int resource_id,
     ui::ScaleFactor scale_factor) const {
-  return ResourceBundle::GetSharedInstance().GetRawDataResource(resource_id);
+  return ResourceBundle::GetSharedInstance().GetRawDataResourceForScale(
+      resource_id, scale_factor);
+}
+
+base::RefCountedStaticMemory* ShellContentClient::GetDataResourceBytes(
+    int resource_id) const {
+  return ResourceBundle::GetSharedInstance().LoadDataResourceBytes(resource_id);
 }
 
 gfx::Image& ShellContentClient::GetNativeImageNamed(int resource_id) const {
@@ -70,6 +77,12 @@ bool ShellContentClient::CanHandleWhileSwappedOut(
       break;
   }
   return false;
+}
+
+void ShellContentClient::AddAdditionalSchemes(
+    std::vector<std::string>* standard_schemes,
+    std::vector<std::string>* savable_schemes) {
+  standard_schemes->push_back("app");
 }
 
 }  // namespace content
